@@ -743,6 +743,7 @@ export default function App() {
               margin: 20px 0;
               width: 100% !important;
               max-width: 100% !important;
+              padding: 0 !important;
             }
             
             .chart-container > div {
@@ -750,19 +751,32 @@ export default function App() {
               max-width: 100% !important;
             }
             
+            /* Recharts responsive container */
+            .recharts-responsive-container {
+              width: 100% !important;
+              max-width: 100% !important;
+            }
+            
+            /* Schedule section - full width and proper formatting */
+            .schedule-section, .page-break-before {
+              page-break-before: always;
+              margin: 0 !important;
+              padding: 0.5in !important;
+              width: 100% !important;
+              text-align: center;
+            }
+            
+            /* Fix overflow containers */
+            .overflow-x-auto {
+              overflow: visible !important;
+              width: 100% !important;
+            }
+            
             /* Loan details section centered */
             .loan-details-section {
               text-align: center;
               margin: 30px 0;
               width: 100%;
-            }
-            
-            /* Schedule section */
-            .schedule-section {
-              page-break-before: always;
-              margin: 0;
-              width: 100%;
-              text-align: center;
             }
             
             /* Tables - full width from margin to margin */
@@ -804,18 +818,33 @@ export default function App() {
             }
             
             /* Schedule table specific styling */
-            .schedule-table th {
-              text-align: center;
-              font-size: 11px;
+            .schedule-table th, 
+            .min-w-full th {
+              text-align: center !important;
+              font-size: 11px !important;
+              padding: 6px !important;
+              border: 1px solid #333 !important;
+              background-color: #f5f5f5 !important;
             }
             
-            .schedule-table td {
-              text-align: center;
-              font-size: 11px;
+            .schedule-table td,
+            .min-w-full td {
+              text-align: center !important;
+              font-size: 11px !important;
+              padding: 6px !important;
+              border: 1px solid #333 !important;
             }
             
-            .schedule-table td:first-child {
-              text-align: center;
+            /* Ensure table cells don't break across pages */
+            .schedule-table tr,
+            .min-w-full tr {
+              page-break-inside: avoid !important;
+            }
+            
+            /* Remove min-width constraints in print */
+            .min-w-full {
+              min-width: auto !important;
+              width: 100% !important;
             }
             
             /* Center all headings */
