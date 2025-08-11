@@ -429,10 +429,197 @@ export default function App() {
           </div>
         </div>
         {/* Input Fields Based on Loan Type */}
-        {/* ...existing code for input fields, summary, chart, actions, and schedule table... */}
-        {/* (This is the same JSX as your original amortization calculator) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          {/* Standard Loan Fields */}
+          {(loanType === 'standard' || loanType === 'balloon' || loanType === 'arm') && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Loan Amount
+                </label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                  <input
+                    type="number"
+                    value={loanAmount}
+                    onChange={(e) => setLoanAmount(Number(e.target.value))}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Interest Rate (%)
+                </label>
+                <div className="relative">
+                  <Percent className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                  <input
+                    type="number"
+                    value={interestRate}
+                    onChange={(e) => setInterestRate(Number(e.target.value))}
+                    step="0.125"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Loan Term (years)
+                </label>
+                <input
+                  type="number"
+                  value={loanTerm}
+                  onChange={(e) => setLoanTerm(Number(e.target.value))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </>
+          )}
+          
+          {/* Common Fields */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Start Date
+            </label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Extra Monthly Payment
+            </label>
+            <div className="relative">
+              <DollarSign className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+              <input
+                type="number"
+                value={extraPayment}
+                onChange={(e) => setExtraPayment(Number(e.target.value))}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Summary Section */}
+        {schedule.length > 0 && (
+          <div className="bg-blue-50 rounded-lg p-6 mb-8">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">Loan Summary</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <p className="text-sm text-gray-600">Monthly Payment</p>
+                <p className="text-2xl font-bold text-blue-600">{formatCurrency(summary.monthlyPayment || 0)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Total Payments</p>
+                <p className="text-2xl font-bold text-gray-800">{formatCurrency(summary.totalPayments || 0)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Total Interest</p>
+                <p className="text-2xl font-bold text-red-600">{formatCurrency(summary.totalInterest || 0)}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Chart Section */}
+        {schedule.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">Payment Breakdown Over Time</h2>
+            <ResponsiveContainer width="100%" height={400}>
+              <LineChart data={getChartData()}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="year" label={{ value: 'Year', position: 'insideBottom', offset: -5 }} />
+                <YAxis label={{ value: 'Amount ($)', angle: -90, position: 'insideLeft' }} />
+                <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                <Legend />
+                <Line type="monotone" dataKey="balance" stroke="#3B82F6" name="Balance" strokeWidth={2} />
+                <Line type="monotone" dataKey="totalPrincipal" stroke="#10B981" name="Total Principal" strokeWidth={2} />
+                <Line type="monotone" dataKey="totalInterest" stroke="#EF4444" name="Total Interest" strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex flex-wrap gap-4 mb-8 print:hidden">
+          <button
+            onClick={() => setShowSchedule(!showSchedule)}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+          >
+            <FileText className="w-5 h-5" />
+            {showSchedule ? 'Hide' : 'Show'} Amortization Schedule
+          </button>
+          
+          <button
+            onClick={handlePrint}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            <FileText className="w-5 h-5" />
+            Print to PDF
+          </button>
+          
+          <button
+            onClick={saveData}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+          >
+            <Download className="w-5 h-5" />
+            Save File
+          </button>
+          
+          <label className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors cursor-pointer">
+            <Upload className="w-5 h-5" />
+            Load File
+            <input
+              type="file"
+              accept=".json,.zip"
+              onChange={handleFileLoad}
+              className="hidden"
+            />
+          </label>
+        </div>
+
+        {/* Amortization Schedule Table */}
+        {showSchedule && schedule.length > 0 && (
+          <div className="overflow-x-auto">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">Amortization Schedule</h2>
+            <table className="min-w-full bg-white border border-gray-300">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="px-4 py-2 border-b text-left text-sm font-medium text-gray-700">Month</th>
+                  <th className="px-4 py-2 border-b text-left text-sm font-medium text-gray-700">Date</th>
+                  <th className="px-4 py-2 border-b text-right text-sm font-medium text-gray-700">Payment</th>
+                  <th className="px-4 py-2 border-b text-right text-sm font-medium text-gray-700">Principal</th>
+                  <th className="px-4 py-2 border-b text-right text-sm font-medium text-gray-700">Interest</th>
+                  <th className="px-4 py-2 border-b text-right text-sm font-medium text-gray-700">Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {schedule.map((row, index) => (
+                  <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                    <td className="px-4 py-2 border-b text-sm">{row.month}</td>
+                    <td className="px-4 py-2 border-b text-sm">{row.date}</td>
+                    <td className="px-4 py-2 border-b text-sm text-right">{formatCurrency(row.payment)}</td>
+                    <td className="px-4 py-2 border-b text-sm text-right">{formatCurrency(row.principal)}</td>
+                    <td className="px-4 py-2 border-b text-sm text-right">{formatCurrency(row.interest)}</td>
+                    <td className="px-4 py-2 border-b text-sm text-right">{formatCurrency(row.balance)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
         {/* Print-specific styles */}
-        <style jsx>{`
+        <style>{`
           @media print {
             body {
               margin: 0;
