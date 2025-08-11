@@ -624,7 +624,7 @@ export default function App() {
 
         {/* Amortization Schedule Table */}
         {schedule.length > 0 && (
-          <div className="bg-white rounded-lg shadow-lg p-6 page-break-before">
+          <div className="bg-white rounded-lg shadow-lg p-6">
             <h2 className="text-xl font-semibold text-gray-800 mb-4">Amortization Schedule</h2>
             <div className="overflow-x-auto">
               <table className="min-w-full border-collapse border border-gray-300">
