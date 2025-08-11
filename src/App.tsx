@@ -401,12 +401,12 @@ export default function App() {
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {loanType === 'balloon' ? 'Amortization Period (years)' : 'Loan Term (years)'}
+                  {loanType === 'balloon' ? 'Loan Term (years)' : 'Loan Term (years)'}
                 </label>
                 <input
                   type="number"
-                  value={loanType === 'balloon' ? amortizationPeriod : loanTerm}
-                  onChange={(e) => loanType === 'balloon' ? setAmortizationPeriod(Number(e.target.value)) : setLoanTerm(Number(e.target.value))}
+                  value={loanTerm}
+                  onChange={(e) => setLoanTerm(Number(e.target.value))}
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -418,6 +418,19 @@ export default function App() {
             <>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Amortization Period (years)
+                </label>
+                <input
+                  type="number"
+                  value={amortizationPeriod}
+                  onChange={(e) => setAmortizationPeriod(Number(e.target.value))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">Payment calculated over this period</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Balloon Payment Due (years)
                 </label>
                 <input
@@ -426,6 +439,7 @@ export default function App() {
                   onChange={(e) => setBalloonTerm(Number(e.target.value))}
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                 />
+                <p className="text-xs text-gray-500 mt-1">When remaining balance is due</p>
               </div>
               
               <div className="flex items-center">
@@ -493,11 +507,27 @@ export default function App() {
                 <p className="text-2xl font-bold text-red-600">{formatCurrency(summary.totalInterest || 0)}</p>
               </div>
               {loanType === 'balloon' && (
+                <>
+                  <div>
+                    <p className="text-sm text-gray-600">Amortization Period</p>
+                    <p className="text-2xl font-bold text-purple-600">{amortizationPeriod} years</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Balloon Due</p>
+                    <p className="text-2xl font-bold text-purple-600">{balloonTerm} years</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Balloon Payment</p>
+                    <p className="text-2xl font-bold text-orange-600">
+                      {formatCurrency(schedule.find(row => row.month === balloonTerm * 12)?.balance || 0)}
+                    </p>
+                  </div>
+                </>
+              )}
+              {loanType !== 'balloon' && (
                 <div>
-                  <p className="text-sm text-gray-600">Balloon Payment</p>
-                  <p className="text-2xl font-bold text-orange-600">
-                    {formatCurrency(schedule.find(row => row.month === balloonTerm * 12)?.balance || 0)}
-                  </p>
+                  <p className="text-sm text-gray-600">Total Principal</p>
+                  <p className="text-2xl font-bold text-green-600">{formatCurrency(summary.totalPrincipal || 0)}</p>
                 </div>
               )}
             </div>
