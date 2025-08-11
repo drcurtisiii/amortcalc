@@ -256,73 +256,15 @@ export default function App() {
       },
       schedule
     };
+    
+    // Create and download JSON file
     const jsonBlob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const pdfContent = generatePDFContent();
-    const zip = await createZipFile(jsonBlob, pdfContent);
     const a = document.createElement('a');
     const saveDate = new Date().toISOString().split('T')[0];
-    a.href = URL.createObjectURL(zip);
-    a.download = `${caseName || 'Untitled'} Amortization ${saveDate}.zip`;
+    a.href = URL.createObjectURL(jsonBlob);
+    a.download = `${caseName || 'Untitled'}_Amortization_${saveDate}.json`;
     a.click();
-  };
-
-  const generatePDFContent = () => {
-    const html = `
-      <html>
-        <head>
-          <title>${caseName || 'Amortization Schedule'}</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            h1 { color: #333; }
-            table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
-            th { background-color: #f2f2f2; }
-            .summary { margin: 20px 0; }
-          </style>
-        </head>
-        <body>
-          <h1>${caseName || 'Amortization Schedule'}</h1>
-          <div class="summary">
-            <p><strong>Loan Type:</strong> ${loanType.charAt(0).toUpperCase() + loanType.slice(1)}</p>
-            <p><strong>Loan Amount:</strong> ${formatCurrency(loanAmount)}</p>
-            <p><strong>Interest Rate:</strong> ${interestRate}%</p>
-            <p><strong>Term:</strong> ${loanTerm} years</p>
-            ${extraPayment > 0 ? `<p><strong>Extra Payment:</strong> ${formatCurrency(extraPayment)}</p>` : ''}
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Month</th>
-                <th>Date</th>
-                <th>Payment</th>
-                <th>Principal</th>
-                <th>Interest</th>
-                <th>Balance</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${schedule.map(row => `
-                <tr>
-                  <td>${row.month}</td>
-                  <td>${row.date}</td>
-                  <td>${formatCurrency(row.payment)}</td>
-                  <td>${formatCurrency(row.principal)}</td>
-                  <td>${formatCurrency(row.interest)}</td>
-                  <td>${formatCurrency(row.balance)}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </body>
-      </html>
-    `;
-    return html;
-  };
-
-  const createZipFile = async (jsonBlob: Blob, pdfContent: string) => {
-    const boundary = '----=_Part_0_1234567890';
-    const zipContent = `--${boundary}\r\nContent-Type: application/json\r\nContent-Disposition: attachment; filename="data.json"\r\n\r\n${await jsonBlob.text()}\r\n--${boundary}\r\nContent-Type: text/html\r\nContent-Disposition: attachment; filename="schedule.html"\r\n\r\n${pdfContent}\r\n--${boundary}--`;
-    return new Blob([zipContent], { type: 'multipart/mixed; boundary=' + boundary });
+    URL.revokeObjectURL(a.href);
   };
 
   const handleFileLoad = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -330,15 +272,8 @@ export default function App() {
     if (!file) return;
     try {
       const text = await file.text();
-      let data;
-      if (file.name.endsWith('.json')) {
-        data = JSON.parse(text);
-      } else {
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          data = JSON.parse(jsonMatch[0]);
-        }
-      }
+      const data = JSON.parse(text);
+      
       if (data) {
         setCaseName(data.caseName || '');
         setLoanType(data.loanType || 'standard');
@@ -466,14 +401,44 @@ export default function App() {
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Loan Term (years)
+                  {loanType === 'balloon' ? 'Amortization Period (years)' : 'Loan Term (years)'}
                 </label>
                 <input
                   type="number"
-                  value={loanTerm}
-                  onChange={(e) => setLoanTerm(Number(e.target.value))}
+                  value={loanType === 'balloon' ? amortizationPeriod : loanTerm}
+                  onChange={(e) => loanType === 'balloon' ? setAmortizationPeriod(Number(e.target.value)) : setLoanTerm(Number(e.target.value))}
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                 />
+              </div>
+            </>
+          )}
+
+          {/* Balloon Mortgage Fields */}
+          {loanType === 'balloon' && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Balloon Payment Due (years)
+                </label>
+                <input
+                  type="number"
+                  value={balloonTerm}
+                  onChange={(e) => setBalloonTerm(Number(e.target.value))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="interestOnly"
+                  checked={isInterestOnly}
+                  onChange={(e) => setIsInterestOnly(e.target.checked)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="interestOnly" className="ml-2 text-sm font-medium text-gray-700">
+                  Interest Only Payments
+                </label>
               </div>
             </>
           )}
@@ -527,6 +492,14 @@ export default function App() {
                 <p className="text-sm text-gray-600">Total Interest</p>
                 <p className="text-2xl font-bold text-red-600">{formatCurrency(summary.totalInterest || 0)}</p>
               </div>
+              {loanType === 'balloon' && (
+                <div>
+                  <p className="text-sm text-gray-600">Balloon Payment</p>
+                  <p className="text-2xl font-bold text-orange-600">
+                    {formatCurrency(schedule.find(row => row.month === balloonTerm * 12)?.balance || 0)}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -581,7 +554,7 @@ export default function App() {
             Load File
             <input
               type="file"
-              accept=".json,.zip"
+              accept=".json"
               onChange={handleFileLoad}
               className="hidden"
             />
