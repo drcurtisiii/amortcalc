@@ -677,6 +677,38 @@ export default function App() {
               text-align: center !important;
             }
             
+            /* Specific centering for main containers */
+            .bg-white, .rounded-lg, .shadow-lg, .p-6, .mb-8 {
+              display: block !important;
+              margin: 0 auto !important;
+              text-align: center !important;
+            }
+            
+            /* Center all headings and titles */
+            h1, h2, h3, .text-xl, .font-semibold, .text-gray-800 {
+              text-align: center !important;
+              margin: 20px auto !important;
+              width: 100% !important;
+              display: block !important;
+            }
+            
+            /* Center tables specifically */
+            table {
+              border-collapse: collapse;
+              width: 100% !important;
+              margin: 20px auto !important;
+              max-width: 100% !important;
+              text-align: center !important;
+            }
+            
+            /* Center table containers */
+            .hidden.print\\:block {
+              display: block !important;
+              text-align: center !important;
+              margin: 0 auto !important;
+              width: 100% !important;
+            }
+            
             /* Hide all elements with print:hidden class */
             .print\\:hidden {
               display: none !important;
@@ -737,8 +769,9 @@ export default function App() {
             table {
               border-collapse: collapse;
               width: 100% !important;
-              margin: 20px 0 !important;
+              margin: 20px auto !important;
               max-width: 100% !important;
+              text-align: center !important;
             }
             
             /* Increased table font sizes */
@@ -795,13 +828,19 @@ export default function App() {
             h1 {
               font-size: 26px;
               color: #1f2937;
-              margin-bottom: 30px;
+              margin: 30px auto !important;
+              text-align: center !important;
+              width: 100% !important;
+              display: block !important;
             }
             
             h2 {
               font-size: 20px;
               color: #374151;
-              margin: 25px 0 15px 0;
+              margin: 25px auto 15px auto !important;
+              text-align: center !important;
+              width: 100% !important;
+              display: block !important;
             }
             
             /* Center all divs and sections */
