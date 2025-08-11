@@ -583,10 +583,10 @@ export default function App() {
                   <td className="border border-gray-300 px-4 py-2 font-bold text-lg">{formatCurrency(summary.totalPayments || 0)}</td>
                 </tr>
                 <tr>
-                  <td className="border border-gray-300 px-4 py-2 bg-gray-50 font-medium">Total Interest</td>
-                  <td className="border border-gray-300 px-4 py-2 text-red-600 font-bold text-lg">{formatCurrency(summary.totalInterest || 0)}</td>
                   <td className="border border-gray-300 px-4 py-2 bg-gray-50 font-medium">Payoff Date</td>
                   <td className="border border-gray-300 px-4 py-2 font-bold text-lg">{summary.payoffDate || 'N/A'}</td>
+                  <td className="border border-gray-300 px-4 py-2 bg-gray-50 font-medium">Total Interest</td>
+                  <td className="border border-gray-300 px-4 py-2 text-red-600 font-bold text-lg">{formatCurrency(summary.totalInterest || 0)}</td>
                 </tr>
                 {loanType === 'balloon' && (
                   <tr>
@@ -741,32 +741,56 @@ export default function App() {
             }
             
             /* CHART SECTION - MOST IMPORTANT */
-            .chart-container,
-            .chart-container * {
+            .chart-container {
+              width: 100% !important;
+              max-width: 100% !important;
+              margin: 15px 0 !important;
+              padding: 0 !important;
+              text-align: center !important;
+              background: white !important;
+              overflow: visible !important;
+            }
+            
+            /* Recharts Overrides - prevent green overlay */
+            .recharts-responsive-container {
               width: 100% !important;
               max-width: 100% !important;
               margin: 0 auto !important;
-              padding: 0 !important;
-              text-align: center !important;
+              background: transparent !important;
+              overflow: visible !important;
             }
             
-            /* Recharts Overrides */
-            .recharts-responsive-container,
-            .recharts-wrapper,
+            .recharts-wrapper {
+              width: 100% !important;
+              max-width: 100% !important;
+              background: transparent !important;
+              overflow: visible !important;
+            }
+            
             .recharts-surface {
               width: 100% !important;
               max-width: 100% !important;
-              margin: 0 auto !important;
+              background: white !important;
+              overflow: visible !important;
             }
             
-            /* SVG Chart Force Full Width */
+            /* SVG Chart Force Full Width - prevent overlay */
             .chart-container svg,
             svg[role="img"] {
               width: 100% !important;
               max-width: 100% !important;
-              height: auto !important;
+              height: 400px !important;
               margin: 0 auto !important;
               display: block !important;
+              background: white !important;
+              overflow: visible !important;
+            }
+            
+            /* Prevent any green backgrounds or overlays */
+            .recharts-cartesian-grid,
+            .recharts-legend-wrapper,
+            .recharts-tooltip-wrapper {
+              background: transparent !important;
             }
             
             /* Table Fixes */
