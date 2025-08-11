@@ -736,25 +736,42 @@ export default function App() {
               page-break-after: always;
             }
             
-            /* Chart container - full width from margin to margin */
+            /* Chart container - full width from margin to margin - UPDATED */
             .chart-container {
               page-break-after: always;
               text-align: center;
-              margin: 20px 0;
+              margin: 20px 0 !important;
+              padding: 0 !important;
               width: 100% !important;
               max-width: 100% !important;
-              padding: 0 !important;
             }
             
             .chart-container > div {
               width: 100% !important;
               max-width: 100% !important;
+              padding: 0 !important;
             }
             
-            /* Recharts responsive container */
+            /* Recharts responsive container - force full width */
             .recharts-responsive-container {
               width: 100% !important;
               max-width: 100% !important;
+              padding: 0 !important;
+            }
+            
+            /* Force all chart elements to full width */
+            .chart-container .recharts-wrapper {
+              width: 100% !important;
+              max-width: 100% !important;
+            }
+            
+            /* Remove any padding from chart elements */
+            .chart-container .bg-white,
+            .chart-container .rounded-lg,
+            .chart-container .shadow-lg {
+              padding: 0 !important;
+              margin: 0 !important;
+              width: 100% !important;
             }
             
             /* Schedule section - full width and proper formatting */
@@ -817,35 +834,50 @@ export default function App() {
               font-size: 12px;
             }
             
-            /* Schedule table specific styling */
+            /* Schedule table specific styling - ENHANCED */
             .schedule-table th, 
-            .min-w-full th {
+            .min-w-full th,
+            table th {
               text-align: center !important;
-              font-size: 11px !important;
-              padding: 6px !important;
+              font-size: 12px !important;
+              padding: 8px !important;
               border: 1px solid #333 !important;
               background-color: #f5f5f5 !important;
+              white-space: nowrap !important;
             }
             
             .schedule-table td,
-            .min-w-full td {
+            .min-w-full td,
+            table td {
               text-align: center !important;
               font-size: 11px !important;
               padding: 6px !important;
               border: 1px solid #333 !important;
+              white-space: nowrap !important;
             }
             
             /* Ensure table cells don't break across pages */
             .schedule-table tr,
-            .min-w-full tr {
+            .min-w-full tr,
+            table tr {
               page-break-inside: avoid !important;
+              break-inside: avoid !important;
             }
             
             /* Remove min-width constraints in print */
             .min-w-full {
               min-width: auto !important;
               width: 100% !important;
+              table-layout: fixed !important;
             }
+            
+            /* Fix table cell widths for better layout */
+            table th:nth-child(1), table td:nth-child(1) { width: 8% !important; }  /* Month */
+            table th:nth-child(2), table td:nth-child(2) { width: 12% !important; } /* Date */
+            table th:nth-child(3), table td:nth-child(3) { width: 15% !important; } /* Payment */
+            table th:nth-child(4), table td:nth-child(4) { width: 15% !important; } /* Principal */
+            table th:nth-child(5), table td:nth-child(5) { width: 15% !important; } /* Interest */
+            table th:nth-child(6), table td:nth-child(6) { width: 20% !important; } /* Balance */
             
             /* Center all headings */
             h1, h2, h3 {
