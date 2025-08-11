@@ -740,57 +740,9 @@ export default function App() {
               page-break-after: always !important;
             }
             
-            /* CHART SECTION - MOST IMPORTANT */
+            /* CHART SECTION - HIDE IN PRINT */
             .chart-container {
-              width: 100% !important;
-              max-width: 100% !important;
-              margin: 15px 0 !important;
-              padding: 0 !important;
-              text-align: center !important;
-              background: white !important;
-              overflow: visible !important;
-            }
-            
-            /* Recharts Overrides - prevent green overlay */
-            .recharts-responsive-container {
-              width: 100% !important;
-              max-width: 100% !important;
-              margin: 0 auto !important;
-              background: transparent !important;
-              overflow: visible !important;
-            }
-            
-            .recharts-wrapper {
-              width: 100% !important;
-              max-width: 100% !important;
-              background: transparent !important;
-              overflow: visible !important;
-            }
-            
-            .recharts-surface {
-              width: 100% !important;
-              max-width: 100% !important;
-              background: white !important;
-              overflow: visible !important;
-            }
-            
-            /* SVG Chart Force Full Width - prevent overlay */
-            .chart-container svg,
-            svg[role="img"] {
-              width: 100% !important;
-              max-width: 100% !important;
-              height: 400px !important;
-              margin: 0 auto !important;
-              display: block !important;
-              background: white !important;
-              overflow: visible !important;
-            }
-            
-            /* Prevent any green backgrounds or overlays */
-            .recharts-cartesian-grid,
-            .recharts-legend-wrapper,
-            .recharts-tooltip-wrapper {
-              background: transparent !important;
+              display: none !important;
             }
             
             /* Table Fixes */
