@@ -324,169 +324,207 @@ export default function App() {
   return (
     <div className="max-w-7xl mx-auto p-6 bg-gray-50 min-h-screen">
       <div className="bg-white rounded-lg shadow-lg p-8 print:shadow-none">
-        <h1 className="text-3xl font-bold text-gray-800 mb-8 flex items-center gap-2">
-          <Calculator className="w-8 h-8 text-blue-600" />
-          Amortization Calculator
-        </h1>
-        {/* Case Name Input */}
-        <div className="mb-6 print:hidden">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Case Name
-          </label>
-          <input
-            type="text"
-            value={caseName}
-            onChange={(e) => setCaseName(e.target.value)}
-            placeholder="e.g., File 2025-665 - Belcher to Ringgold"
-            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
-        </div>
-        
-        {/* Loan Type Selection */}
-        <div className="mb-6 print:hidden">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Loan Type
-          </label>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {['standard', 'recasting', 'balloon', 'arm'].map((type) => (
-              <button
-                key={type}
-                onClick={() => setLoanType(type)}
-                className={`px-4 py-2 rounded-md font-medium transition-colors ${
-                  loanType === type
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-              >
-                {type === 'arm' ? 'Adjustable Rate' : type.charAt(0).toUpperCase() + type.slice(1)}
-              </button>
-            ))}
+        {/* Header with Title and Action Buttons */}
+        <div className="flex justify-between items-start mb-8">
+          <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
+            <Calculator className="w-8 h-8 text-blue-600" />
+            Amortization Calculator
+          </h1>
+          
+          {/* Action Buttons - Top Right */}
+          <div className="flex gap-2 print:hidden">
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-black rounded-md hover:bg-gray-300 transition-colors min-w-[120px] justify-center"
+            >
+              <FileText className="w-4 h-4" />
+              Print to PDF
+            </button>
+            
+            <button
+              onClick={saveData}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-black rounded-md hover:bg-gray-300 transition-colors min-w-[120px] justify-center"
+            >
+              <Download className="w-4 h-4" />
+              Save File
+            </button>
+            
+            <label className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-black rounded-md hover:bg-gray-300 transition-colors cursor-pointer min-w-[120px] justify-center">
+              <Upload className="w-4 h-4" />
+              Load File
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleFileLoad}
+                className="hidden"
+              />
+            </label>
           </div>
         </div>
-        
-        {/* Input Fields Based on Loan Type */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8 print:hidden">
-          {/* Standard Loan Fields */}
-          {(loanType === 'standard' || loanType === 'balloon' || loanType === 'arm') && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Loan Amount
-                </label>
-                <div className="relative">
-                  <DollarSign className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+        {/* Input Form as Table */}
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-8 print:hidden">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">Loan Information</h2>
+          <table className="w-full border-collapse border border-gray-300">
+            <tbody>
+              <tr>
+                <td className="border border-gray-300 px-4 py-3 bg-gray-50 font-medium w-1/2">Case Name</td>
+                <td className="border border-gray-300 px-4 py-3">
                   <input
-                    type="number"
-                    value={loanAmount}
-                    onChange={(e) => setLoanAmount(Number(e.target.value))}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                    type="text"
+                    value={caseName}
+                    onChange={(e) => setCaseName(e.target.value)}
+                    placeholder="e.g., File 2025-665 - Belcher to Ringgold"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Interest Rate (%)
-                </label>
-                <div className="relative">
-                  <Percent className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                  <input
-                    type="number"
-                    value={interestRate}
-                    onChange={(e) => setInterestRate(Number(e.target.value))}
-                    step="0.125"
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 px-4 py-3 bg-gray-50 font-medium">Loan Type</td>
+                <td className="border border-gray-300 px-4 py-3">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {['standard', 'recasting', 'balloon', 'arm'].map((type) => (
+                      <button
+                        key={type}
+                        onClick={() => setLoanType(type)}
+                        className={`px-3 py-2 rounded-md font-medium transition-colors text-sm ${
+                          loanType === type
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {type === 'arm' ? 'Adjustable Rate' : type.charAt(0).toUpperCase() + type.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 px-4 py-3 bg-gray-50 font-medium">Loan Amount</td>
+                <td className="border border-gray-300 px-4 py-3">
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                    <input
+                      type="number"
+                      value={loanAmount}
+                      onChange={(e) => setLoanAmount(Number(e.target.value))}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 px-4 py-3 bg-gray-50 font-medium">Interest Rate (%)</td>
+                <td className="border border-gray-300 px-4 py-3">
+                  <div className="relative">
+                    <Percent className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                    <input
+                      type="number"
+                      value={interestRate}
+                      onChange={(e) => setInterestRate(Number(e.target.value))}
+                      step="0.125"
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 px-4 py-3 bg-gray-50 font-medium">
                   {loanType === 'balloon' ? 'Loan Term (years)' : 'Loan Term (years)'}
-                </label>
-                <input
-                  type="number"
-                  value={loanTerm}
-                  onChange={(e) => setLoanTerm(Number(e.target.value))}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </>
-          )}
-
-          {/* Balloon Mortgage Fields */}
-          {loanType === 'balloon' && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Amortization Period (years)
-                </label>
-                <input
-                  type="number"
-                  value={amortizationPeriod}
-                  onChange={(e) => setAmortizationPeriod(Number(e.target.value))}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                />
-                <p className="text-xs text-gray-500 mt-1">Payment calculated over this period</p>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Balloon Payment Due (years)
-                </label>
-                <input
-                  type="number"
-                  value={balloonTerm}
-                  onChange={(e) => setBalloonTerm(Number(e.target.value))}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                />
-                <p className="text-xs text-gray-500 mt-1">When remaining balance is due</p>
-              </div>
-              
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="interestOnly"
-                  checked={isInterestOnly}
-                  onChange={(e) => setIsInterestOnly(e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <label htmlFor="interestOnly" className="ml-2 text-sm font-medium text-gray-700">
-                  Interest Only Payments
-                </label>
-              </div>
-            </>
-          )}
+                </td>
+                <td className="border border-gray-300 px-4 py-3">
+                  <input
+                    type="number"
+                    value={loanTerm}
+                    onChange={(e) => setLoanTerm(Number(e.target.value))}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                  />
+                </td>
+              </tr>
+              {loanType === 'balloon' && (
+                <>
+                  <tr>
+                    <td className="border border-gray-300 px-4 py-3 bg-gray-50 font-medium">Amortization Period (years)</td>
+                    <td className="border border-gray-300 px-4 py-3">
+                      <input
+                        type="number"
+                        value={amortizationPeriod}
+                        onChange={(e) => setAmortizationPeriod(Number(e.target.value))}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Payment calculated over this period</p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 px-4 py-3 bg-gray-50 font-medium">Balloon Payment Due (years)</td>
+                    <td className="border border-gray-300 px-4 py-3">
+                      <input
+                        type="number"
+                        value={balloonTerm}
+                        onChange={(e) => setBalloonTerm(Number(e.target.value))}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">When remaining balance is due</p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 px-4 py-3 bg-gray-50 font-medium">Interest Only Payments</td>
+                    <td className="border border-gray-300 px-4 py-3">
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id="interestOnly"
+                          checked={isInterestOnly}
+                          onChange={(e) => setIsInterestOnly(e.target.checked)}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                        <label htmlFor="interestOnly" className="ml-2 text-sm font-medium text-gray-700">
+                          Yes, interest only payments
+                        </label>
+                      </div>
+                    </td>
+                  </tr>
+                </>
+              )}
+              <tr>
+                <td className="border border-gray-300 px-4 py-3 bg-gray-50 font-medium">Start Date</td>
+                <td className="border border-gray-300 px-4 py-3">
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 px-4 py-3 bg-gray-50 font-medium">Extra Monthly Payment</td>
+                <td className="border border-gray-300 px-4 py-3">
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                    <input
+                      type="number"
+                      value={extraPayment}
+                      onChange={(e) => setExtraPayment(Number(e.target.value))}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
           
-          {/* Common Fields */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Start Date
-            </label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Extra Monthly Payment
-            </label>
-            <div className="relative">
-              <DollarSign className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-              <input
-                type="number"
-                value={extraPayment}
-                onChange={(e) => setExtraPayment(Number(e.target.value))}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+          {/* Calculate Button */}
+          <div className="mt-6 text-center">
+            <button
+              onClick={calculateSchedule}
+              className="bg-blue-600 text-white px-8 py-3 rounded-md hover:bg-blue-700 flex items-center gap-2 mx-auto font-medium"
+            >
+              <Calculator className="w-5 h-5" />
+              Calculate Amortization
+            </button>
           </div>
         </div>
         {/* Loan Type Selection */}
@@ -636,8 +674,8 @@ export default function App() {
           </div>
         </div>
 
-        {/* Loan Details Table */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
+        {/* Loan Details Table - Hidden on web, visible in PDF */}
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-8 hidden print:block">
           <h2 className="text-xl font-semibold text-gray-800 mb-4">Loan Details</h2>
           <table className="w-full border-collapse border border-gray-300">
             <tbody>
@@ -730,36 +768,6 @@ export default function App() {
             </ResponsiveContainer>
           </div>
         )}
-
-        {/* Action Buttons */}
-        <div className="flex flex-wrap gap-4 mb-8 print:hidden">
-          <button
-            onClick={handlePrint}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-          >
-            <FileText className="w-5 h-5" />
-            Print to PDF
-          </button>
-          
-          <button
-            onClick={saveData}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-          >
-            <Download className="w-5 h-5" />
-            Save File
-          </button>
-          
-          <label className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors cursor-pointer">
-            <Upload className="w-5 h-5" />
-            Load File
-            <input
-              type="file"
-              accept=".json"
-              onChange={handleFileLoad}
-              className="hidden"
-            />
-          </label>
-        </div>
 
         {/* Amortization Schedule Table */}
         {schedule.length > 0 && (
