@@ -349,16 +349,21 @@ export default function App() {
               Save File
             </button>
             
-            <label className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-black rounded-md hover:bg-gray-300 transition-colors cursor-pointer min-w-[120px] justify-center">
+            <button
+              onClick={() => document.getElementById('fileInput')?.click()}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-black rounded-md hover:bg-gray-300 transition-colors min-w-[120px] justify-center"
+            >
               <Upload className="w-4 h-4" />
               Load File
-              <input
-                type="file"
-                accept=".json"
-                onChange={handleFileLoad}
-                className="hidden"
-              />
-            </label>
+            </button>
+            
+            <input
+              id="fileInput"
+              type="file"
+              accept=".json"
+              onChange={handleFileLoad}
+              className="hidden"
+            />
           </div>
         </div>
         {/* Input Form as Table */}
