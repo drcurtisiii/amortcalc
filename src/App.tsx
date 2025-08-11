@@ -329,7 +329,7 @@ export default function App() {
           Amortization Calculator
         </h1>
         {/* Case Name Input */}
-        <div className="mb-6">
+        <div className="mb-6 print:hidden">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Case Name
           </label>
@@ -340,6 +340,154 @@ export default function App() {
             placeholder="e.g., File 2025-665 - Belcher to Ringgold"
             className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
+        </div>
+        
+        {/* Loan Type Selection */}
+        <div className="mb-6 print:hidden">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Loan Type
+          </label>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {['standard', 'recasting', 'balloon', 'arm'].map((type) => (
+              <button
+                key={type}
+                onClick={() => setLoanType(type)}
+                className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                  loanType === type
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                {type === 'arm' ? 'Adjustable Rate' : type.charAt(0).toUpperCase() + type.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+        
+        {/* Input Fields Based on Loan Type */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8 print:hidden">
+          {/* Standard Loan Fields */}
+          {(loanType === 'standard' || loanType === 'balloon' || loanType === 'arm') && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Loan Amount
+                </label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                  <input
+                    type="number"
+                    value={loanAmount}
+                    onChange={(e) => setLoanAmount(Number(e.target.value))}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Interest Rate (%)
+                </label>
+                <div className="relative">
+                  <Percent className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                  <input
+                    type="number"
+                    value={interestRate}
+                    onChange={(e) => setInterestRate(Number(e.target.value))}
+                    step="0.125"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {loanType === 'balloon' ? 'Loan Term (years)' : 'Loan Term (years)'}
+                </label>
+                <input
+                  type="number"
+                  value={loanTerm}
+                  onChange={(e) => setLoanTerm(Number(e.target.value))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </>
+          )}
+
+          {/* Balloon Mortgage Fields */}
+          {loanType === 'balloon' && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Amortization Period (years)
+                </label>
+                <input
+                  type="number"
+                  value={amortizationPeriod}
+                  onChange={(e) => setAmortizationPeriod(Number(e.target.value))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">Payment calculated over this period</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Balloon Payment Due (years)
+                </label>
+                <input
+                  type="number"
+                  value={balloonTerm}
+                  onChange={(e) => setBalloonTerm(Number(e.target.value))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">When remaining balance is due</p>
+              </div>
+              
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="interestOnly"
+                  checked={isInterestOnly}
+                  onChange={(e) => setIsInterestOnly(e.target.checked)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="interestOnly" className="ml-2 text-sm font-medium text-gray-700">
+                  Interest Only Payments
+                </label>
+              </div>
+            </>
+          )}
+          
+          {/* Common Fields */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Start Date
+            </label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Extra Monthly Payment
+            </label>
+            <div className="relative">
+              <DollarSign className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+              <input
+                type="number"
+                value={extraPayment}
+                onChange={(e) => setExtraPayment(Number(e.target.value))}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
         </div>
         {/* Loan Type Selection */}
         <div className="mb-6">
@@ -650,32 +798,108 @@ export default function App() {
           @media print {
             body {
               margin: 0;
-              padding: 20px;
+              padding: 0;
               font-size: 12px;
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             }
+            
+            .container {
+              max-width: 8.5in;
+              margin: 0 auto;
+              padding: 0.5in;
+            }
+            
+            .print:hidden {
+              display: none !important;
+            }
+            
             .no-print {
               display: none !important;
             }
+            
             .page-break-before {
               page-break-before: always;
             }
+            
             .page-break-after {
               page-break-after: always;
             }
+            
+            .chart-container {
+              page-break-after: always;
+              text-align: center;
+              margin: 0 auto;
+              max-width: 6in;
+            }
+            
+            .loan-details-section {
+              text-align: center;
+              margin: 30px auto;
+              max-width: 6in;
+            }
+            
+            .schedule-section {
+              page-break-before: always;
+              margin: 0 auto;
+              max-width: 8in;
+            }
+            
             table {
               border-collapse: collapse;
               width: 100%;
+              margin: 0 auto;
             }
+            
             th, td {
-              border: 1px solid #000;
-              padding: 4px;
+              border: 1px solid #333;
+              padding: 6px;
               font-size: 10px;
             }
+            
             th {
-              background-color: #f0f0f0;
+              background-color: #f5f5f5;
+              font-weight: 600;
+              text-align: center;
             }
-            .chart-container {
-              page-break-after: always;
+            
+            .loan-details-table th {
+              width: 40%;
+              text-align: left;
+              background-color: #e8e8e8;
+            }
+            
+            .loan-details-table td {
+              width: 60%;
+              text-align: right;
+            }
+            
+            .schedule-table th {
+              text-align: center;
+              font-size: 9px;
+            }
+            
+            .schedule-table td {
+              text-align: right;
+              font-size: 9px;
+            }
+            
+            .schedule-table td:first-child {
+              text-align: center;
+            }
+            
+            h1, h2 {
+              text-align: center;
+              margin: 20px 0;
+            }
+            
+            h1 {
+              font-size: 24px;
+              color: #1f2937;
+            }
+            
+            h2 {
+              font-size: 18px;
+              color: #374151;
             }
           }
         `}</style>
