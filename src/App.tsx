@@ -662,12 +662,19 @@ export default function App() {
               padding: 0;
               font-size: 12px;
               font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              text-align: center;
             }
             
-            .container {
-              max-width: 8.5in;
+            .container, .max-w-7xl {
+              max-width: 100% !important;
               margin: 0 auto;
               padding: 0.5in;
+              text-align: center;
+            }
+            
+            /* Center all content */
+            * {
+              text-align: center !important;
             }
             
             /* Hide all elements with print:hidden class */
@@ -697,81 +704,116 @@ export default function App() {
               page-break-after: always;
             }
             
+            /* Chart container - full width from margin to margin */
             .chart-container {
               page-break-after: always;
               text-align: center;
-              margin: 0 auto;
-              max-width: 6in;
+              margin: 20px 0;
+              width: 100% !important;
+              max-width: 100% !important;
             }
             
+            .chart-container > div {
+              width: 100% !important;
+              max-width: 100% !important;
+            }
+            
+            /* Loan details section centered */
             .loan-details-section {
               text-align: center;
-              margin: 30px auto;
-              max-width: 6in;
+              margin: 30px 0;
+              width: 100%;
             }
             
+            /* Schedule section */
             .schedule-section {
               page-break-before: always;
-              margin: 0 auto;
-              max-width: 8in;
+              margin: 0;
+              width: 100%;
+              text-align: center;
             }
             
+            /* Tables - full width from margin to margin */
             table {
               border-collapse: collapse;
-              width: 100%;
-              margin: 0 auto;
+              width: 100% !important;
+              margin: 20px 0 !important;
+              max-width: 100% !important;
             }
             
+            /* Increased table font sizes */
             th, td {
               border: 1px solid #333;
-              padding: 6px;
-              font-size: 10px;
+              padding: 8px;
+              font-size: 12px;
+              text-align: center;
             }
             
             th {
               background-color: #f5f5f5;
               font-weight: 600;
               text-align: center;
+              font-size: 13px;
             }
             
+            /* Loan details table specific styling */
             .loan-details-table th {
-              width: 40%;
-              text-align: left;
+              width: 25%;
+              text-align: center;
               background-color: #e8e8e8;
+              font-size: 13px;
             }
             
             .loan-details-table td {
-              width: 60%;
-              text-align: right;
+              width: 25%;
+              text-align: center;
+              font-size: 12px;
             }
             
+            /* Schedule table specific styling */
             .schedule-table th {
               text-align: center;
-              font-size: 9px;
+              font-size: 11px;
             }
             
             .schedule-table td {
-              text-align: right;
-              font-size: 9px;
+              text-align: center;
+              font-size: 11px;
             }
             
             .schedule-table td:first-child {
               text-align: center;
             }
             
-            h1, h2 {
-              text-align: center;
+            /* Center all headings */
+            h1, h2, h3 {
+              text-align: center !important;
               margin: 20px 0;
+              width: 100%;
             }
             
             h1 {
-              font-size: 24px;
+              font-size: 26px;
               color: #1f2937;
+              margin-bottom: 30px;
             }
             
             h2 {
-              font-size: 18px;
+              font-size: 20px;
               color: #374151;
+              margin: 25px 0 15px 0;
+            }
+            
+            /* Center all divs and sections */
+            div, section {
+              text-align: center;
+            }
+            
+            /* Ensure full width for main containers */
+            .bg-white, .rounded-lg, .shadow-lg {
+              width: 100% !important;
+              max-width: 100% !important;
+              margin: 0 auto;
             }
           }
         `}</style>
