@@ -15,7 +15,7 @@ const formatCurrency = (amount: number): string => {
 const formatDate = (date: string | Date): string => {
   return new Date(date).toLocaleDateString('en-US', {
     year: 'numeric',
-    month: 'short',
+    month: 'numeric',
     day: 'numeric'
   });
 };
@@ -147,7 +147,6 @@ export default function App() {
   const [periodicCap, setPeriodicCap] = useState(2);
   const [lifetimeCap, setLifetimeCap] = useState(5);
   const [schedule, setSchedule] = useState<any[]>([]);
-  const [showSchedule, setShowSchedule] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -489,54 +488,85 @@ export default function App() {
           </div>
         </div>
 
+        {/* Loan Details Table */}
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">Loan Details</h2>
+          <table className="w-full border-collapse border border-gray-300">
+            <tbody>
+              <tr>
+                <td className="border border-gray-300 px-4 py-2 bg-gray-50 font-medium">Case Name</td>
+                <td className="border border-gray-300 px-4 py-2">{caseName || 'N/A'}</td>
+                <td className="border border-gray-300 px-4 py-2 bg-gray-50 font-medium">Loan Type</td>
+                <td className="border border-gray-300 px-4 py-2">{loanType.charAt(0).toUpperCase() + loanType.slice(1)}</td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 px-4 py-2 bg-gray-50 font-medium">Loan Amount</td>
+                <td className="border border-gray-300 px-4 py-2">{formatCurrency(loanAmount)}</td>
+                <td className="border border-gray-300 px-4 py-2 bg-gray-50 font-medium">Interest Rate</td>
+                <td className="border border-gray-300 px-4 py-2">{interestRate}%</td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 px-4 py-2 bg-gray-50 font-medium">{loanType === 'balloon' ? 'Amortization Period' : 'Loan Term'}</td>
+                <td className="border border-gray-300 px-4 py-2">{loanType === 'balloon' ? amortizationPeriod : loanTerm} years</td>
+                <td className="border border-gray-300 px-4 py-2 bg-gray-50 font-medium">Start Date</td>
+                <td className="border border-gray-300 px-4 py-2">{formatDate(startDate)}</td>
+              </tr>
+              {loanType === 'balloon' && (
+                <tr>
+                  <td className="border border-gray-300 px-4 py-2 bg-gray-50 font-medium">Balloon Due</td>
+                  <td className="border border-gray-300 px-4 py-2">{balloonTerm} years</td>
+                  <td className="border border-gray-300 px-4 py-2 bg-gray-50 font-medium">Interest Only</td>
+                  <td className="border border-gray-300 px-4 py-2">{isInterestOnly ? 'Yes' : 'No'}</td>
+                </tr>
+              )}
+              {extraPayment > 0 && (
+                <tr>
+                  <td className="border border-gray-300 px-4 py-2 bg-gray-50 font-medium">Extra Payment</td>
+                  <td className="border border-gray-300 px-4 py-2">{formatCurrency(extraPayment)}</td>
+                  <td className="border border-gray-300 px-4 py-2 bg-gray-50 font-medium"></td>
+                  <td className="border border-gray-300 px-4 py-2"></td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
         {/* Summary Section */}
         {schedule.length > 0 && (
-          <div className="bg-blue-50 rounded-lg p-6 mb-8">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Loan Summary</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div>
-                <p className="text-sm text-gray-600">Monthly Payment</p>
-                <p className="text-2xl font-bold text-blue-600">{formatCurrency(summary.monthlyPayment || 0)}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Total Payments</p>
-                <p className="text-2xl font-bold text-gray-800">{formatCurrency(summary.totalPayments || 0)}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Total Interest</p>
-                <p className="text-2xl font-bold text-red-600">{formatCurrency(summary.totalInterest || 0)}</p>
-              </div>
-              {loanType === 'balloon' && (
-                <>
-                  <div>
-                    <p className="text-sm text-gray-600">Amortization Period</p>
-                    <p className="text-2xl font-bold text-purple-600">{amortizationPeriod} years</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Balloon Due</p>
-                    <p className="text-2xl font-bold text-purple-600">{balloonTerm} years</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Balloon Payment</p>
-                    <p className="text-2xl font-bold text-orange-600">
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">Payment Summary</h2>
+            <table className="w-full border-collapse border border-gray-300">
+              <tbody>
+                <tr>
+                  <td className="border border-gray-300 px-4 py-2 bg-gray-50 font-medium">Monthly Payment</td>
+                  <td className="border border-gray-300 px-4 py-2 text-blue-600 font-bold text-lg">{formatCurrency(summary.monthlyPayment || 0)}</td>
+                  <td className="border border-gray-300 px-4 py-2 bg-gray-50 font-medium">Total Payments</td>
+                  <td className="border border-gray-300 px-4 py-2 font-bold text-lg">{formatCurrency(summary.totalPayments || 0)}</td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 px-4 py-2 bg-gray-50 font-medium">Total Interest</td>
+                  <td className="border border-gray-300 px-4 py-2 text-red-600 font-bold text-lg">{formatCurrency(summary.totalInterest || 0)}</td>
+                  <td className="border border-gray-300 px-4 py-2 bg-gray-50 font-medium">Payoff Date</td>
+                  <td className="border border-gray-300 px-4 py-2 font-bold text-lg">{summary.payoffDate || 'N/A'}</td>
+                </tr>
+                {loanType === 'balloon' && (
+                  <tr>
+                    <td className="border border-gray-300 px-4 py-2 bg-gray-50 font-medium">Balloon Payment</td>
+                    <td className="border border-gray-300 px-4 py-2 text-orange-600 font-bold text-lg">
                       {formatCurrency(schedule.find(row => row.month === balloonTerm * 12)?.balance || 0)}
-                    </p>
-                  </div>
-                </>
-              )}
-              {loanType !== 'balloon' && (
-                <div>
-                  <p className="text-sm text-gray-600">Total Principal</p>
-                  <p className="text-2xl font-bold text-green-600">{formatCurrency(summary.totalPrincipal || 0)}</p>
-                </div>
-              )}
-            </div>
+                    </td>
+                    <td className="border border-gray-300 px-4 py-2 bg-gray-50 font-medium"></td>
+                    <td className="border border-gray-300 px-4 py-2"></td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         )}
 
         {/* Chart Section */}
         {schedule.length > 0 && (
-          <div className="mb-8">
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-8 chart-container page-break-after">
             <h2 className="text-xl font-semibold text-gray-800 mb-4">Payment Breakdown Over Time</h2>
             <ResponsiveContainer width="100%" height={400}>
               <LineChart data={getChartData()}>
@@ -555,14 +585,6 @@ export default function App() {
 
         {/* Action Buttons */}
         <div className="flex flex-wrap gap-4 mb-8 print:hidden">
-          <button
-            onClick={() => setShowSchedule(!showSchedule)}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
-          >
-            <FileText className="w-5 h-5" />
-            {showSchedule ? 'Hide' : 'Show'} Amortization Schedule
-          </button>
-          
           <button
             onClick={handlePrint}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
@@ -592,33 +614,35 @@ export default function App() {
         </div>
 
         {/* Amortization Schedule Table */}
-        {showSchedule && schedule.length > 0 && (
-          <div className="overflow-x-auto">
+        {schedule.length > 0 && (
+          <div className="bg-white rounded-lg shadow-lg p-6 page-break-before">
             <h2 className="text-xl font-semibold text-gray-800 mb-4">Amortization Schedule</h2>
-            <table className="min-w-full bg-white border border-gray-300">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="px-4 py-2 border-b text-left text-sm font-medium text-gray-700">Month</th>
-                  <th className="px-4 py-2 border-b text-left text-sm font-medium text-gray-700">Date</th>
-                  <th className="px-4 py-2 border-b text-right text-sm font-medium text-gray-700">Payment</th>
-                  <th className="px-4 py-2 border-b text-right text-sm font-medium text-gray-700">Principal</th>
-                  <th className="px-4 py-2 border-b text-right text-sm font-medium text-gray-700">Interest</th>
-                  <th className="px-4 py-2 border-b text-right text-sm font-medium text-gray-700">Balance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {schedule.map((row, index) => (
-                  <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                    <td className="px-4 py-2 border-b text-sm">{row.month}</td>
-                    <td className="px-4 py-2 border-b text-sm">{row.date}</td>
-                    <td className="px-4 py-2 border-b text-sm text-right">{formatCurrency(row.payment)}</td>
-                    <td className="px-4 py-2 border-b text-sm text-right">{formatCurrency(row.principal)}</td>
-                    <td className="px-4 py-2 border-b text-sm text-right">{formatCurrency(row.interest)}</td>
-                    <td className="px-4 py-2 border-b text-sm text-right">{formatCurrency(row.balance)}</td>
+            <div className="overflow-x-auto">
+              <table className="min-w-full border-collapse border border-gray-300">
+                <thead>
+                  <tr className="bg-gray-100">
+                    <th className="border border-gray-300 px-4 py-2 text-left text-sm font-medium text-gray-700">Month</th>
+                    <th className="border border-gray-300 px-4 py-2 text-left text-sm font-medium text-gray-700">Date</th>
+                    <th className="border border-gray-300 px-4 py-2 text-right text-sm font-medium text-gray-700">Payment</th>
+                    <th className="border border-gray-300 px-4 py-2 text-right text-sm font-medium text-gray-700">Principal</th>
+                    <th className="border border-gray-300 px-4 py-2 text-right text-sm font-medium text-gray-700">Interest</th>
+                    <th className="border border-gray-300 px-4 py-2 text-right text-sm font-medium text-gray-700">Balance</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {schedule.map((row, index) => (
+                    <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                      <td className="border border-gray-300 px-4 py-2 text-sm">{row.month}</td>
+                      <td className="border border-gray-300 px-4 py-2 text-sm">{row.date}</td>
+                      <td className="border border-gray-300 px-4 py-2 text-sm text-right">{formatCurrency(row.payment)}</td>
+                      <td className="border border-gray-300 px-4 py-2 text-sm text-right">{formatCurrency(row.principal)}</td>
+                      <td className="border border-gray-300 px-4 py-2 text-sm text-right">{formatCurrency(row.interest)}</td>
+                      <td className="border border-gray-300 px-4 py-2 text-sm text-right">{formatCurrency(row.balance)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
         {/* Print-specific styles */}
@@ -627,9 +651,31 @@ export default function App() {
             body {
               margin: 0;
               padding: 20px;
+              font-size: 12px;
             }
             .no-print {
               display: none !important;
+            }
+            .page-break-before {
+              page-break-before: always;
+            }
+            .page-break-after {
+              page-break-after: always;
+            }
+            table {
+              border-collapse: collapse;
+              width: 100%;
+            }
+            th, td {
+              border: 1px solid #000;
+              padding: 4px;
+              font-size: 10px;
+            }
+            th {
+              background-color: #f0f0f0;
+            }
+            .chart-container {
+              page-break-after: always;
             }
           }
         `}</style>
