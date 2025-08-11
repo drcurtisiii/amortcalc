@@ -657,263 +657,175 @@ export default function App() {
         {/* Print-specific styles */}
         <style>{`
           @media print {
-            body {
-              margin: 0;
-              padding: 0;
-              font-size: 12px;
-              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-              text-align: center;
-            }
-            
-            .container, .max-w-7xl {
-              max-width: 100% !important;
-              margin: 0 auto;
-              padding: 0.5in;
-              text-align: center;
-            }
-            
-            /* Center all content */
+            /* Global Reset */
             * {
-              text-align: center !important;
+              box-sizing: border-box !important;
+              margin: 0 !important;
+              padding: 0 !important;
             }
             
-            /* Specific centering for main containers */
-            .bg-white, .rounded-lg, .shadow-lg, .p-6, .mb-8 {
-              display: block !important;
-              margin: 0 auto !important;
-              text-align: center !important;
+            /* Page Setup */
+            @page {
+              margin: 0.5in;
+              size: letter;
             }
             
-            /* Center all headings and titles */
-            h1, h2, h3, .text-xl, .font-semibold, .text-gray-800 {
-              text-align: center !important;
-              margin: 20px auto !important;
+            html, body {
               width: 100% !important;
-              display: block !important;
+              height: auto !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              font-size: 12px !important;
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+              background: white !important;
+              color: black !important;
             }
             
-            /* Center tables specifically */
-            table {
-              border-collapse: collapse;
+            /* Main Container */
+            .container, .max-w-7xl, .mx-auto, .w-full {
               width: 100% !important;
-              margin: 20px auto !important;
               max-width: 100% !important;
-              text-align: center !important;
-            }
-            
-            /* Center table containers */
-            .hidden.print\\:block {
-              display: block !important;
-              text-align: center !important;
               margin: 0 auto !important;
-              width: 100% !important;
+              padding: 0 !important;
             }
             
-            /* Hide all elements with print:hidden class */
-            .print\\:hidden {
+            /* Hide Interactive Elements */
+            button, input, select, textarea, label[for], .print\\:hidden {
               display: none !important;
             }
             
-            /* Show elements that should only appear in print */
+            .no-print, .hidden {
+              display: none !important;
+            }
+            
             .hidden.print\\:block {
               display: block !important;
             }
             
-            /* Hide all buttons, inputs, and interactive elements */
-            button, input, select, textarea, label[for] {
-              display: none !important;
-            }
-            
-            .no-print {
-              display: none !important;
-            }
-            
-            .page-break-before {
-              page-break-before: always;
-            }
-            
-            .page-break-after {
-              page-break-after: always;
-            }
-            
-            /* Chart container - full width from margin to margin - UPDATED */
-            .chart-container {
-              page-break-after: always;
-              text-align: center;
+            /* Headers */
+            h1 {
+              font-size: 26px !important;
+              color: #1f2937 !important;
+              text-align: center !important;
               margin: 20px 0 !important;
-              padding: 0 !important;
+              page-break-after: avoid !important;
+            }
+            
+            h2 {
+              font-size: 20px !important;
+              color: #374151 !important;
+              text-align: center !important;
+              margin: 15px 0 10px 0 !important;
+              page-break-after: avoid !important;
+            }
+            
+            /* Content Sections */
+            .bg-white, .rounded-lg, .shadow-lg, .p-6, .mb-8 {
+              background: white !important;
+              border: none !important;
+              border-radius: 0 !important;
+              box-shadow: none !important;
               width: 100% !important;
               max-width: 100% !important;
-            }
-            
-            .chart-container > div {
-              width: 100% !important;
-              max-width: 100% !important;
+              margin: 15px 0 !important;
               padding: 0 !important;
             }
             
-            /* Recharts responsive container - force full width */
-            .recharts-responsive-container {
+            /* Page Breaks */
+            .page-break-before {
+              page-break-before: always !important;
+            }
+            
+            .page-break-after, .chart-container {
+              page-break-after: always !important;
+            }
+            
+            /* CHART SECTION - MOST IMPORTANT */
+            .chart-container,
+            .chart-container * {
               width: 100% !important;
               max-width: 100% !important;
+              margin: 0 auto !important;
               padding: 0 !important;
+              text-align: center !important;
             }
             
-            /* Force all chart elements to full width */
-            .chart-container .recharts-wrapper {
+            /* Recharts Overrides */
+            .recharts-responsive-container,
+            .recharts-wrapper,
+            .recharts-surface {
               width: 100% !important;
               max-width: 100% !important;
+              margin: 0 auto !important;
             }
             
-            /* Remove any padding from chart elements */
-            .chart-container .bg-white,
-            .chart-container .rounded-lg,
-            .chart-container .shadow-lg {
-              padding: 0 !important;
-              margin: 0 !important;
+            /* SVG Chart Force Full Width */
+            .chart-container svg,
+            svg[role="img"] {
               width: 100% !important;
+              max-width: 100% !important;
+              height: auto !important;
+              margin: 0 auto !important;
+              display: block !important;
             }
             
-            /* Schedule section - full width and proper formatting */
-            .schedule-section, .page-break-before {
-              page-break-before: always;
-              margin: 0 !important;
-              padding: 0.5in !important;
-              width: 100% !important;
-              text-align: center;
-            }
-            
-            /* Fix overflow containers */
+            /* Table Fixes */
             .overflow-x-auto {
               overflow: visible !important;
               width: 100% !important;
             }
             
-            /* Loan details section centered */
-            .loan-details-section {
-              text-align: center;
-              margin: 30px 0;
-              width: 100%;
-            }
-            
-            /* Tables - full width from margin to margin */
-            table {
-              border-collapse: collapse;
+            table, .min-w-full {
               width: 100% !important;
-              margin: 20px auto !important;
               max-width: 100% !important;
-              text-align: center !important;
+              min-width: auto !important;
+              table-layout: fixed !important;
+              border-collapse: collapse !important;
+              margin: 15px 0 !important;
+              font-size: 11px !important;
             }
             
-            /* Increased table font sizes */
             th, td {
-              border: 1px solid #333;
-              padding: 8px;
-              font-size: 12px;
-              text-align: center;
+              border: 1px solid #333 !important;
+              padding: 6px 4px !important;
+              text-align: center !important;
+              vertical-align: middle !important;
+              word-wrap: break-word !important;
+              font-size: 11px !important;
             }
             
             th {
-              background-color: #f5f5f5;
-              font-weight: 600;
-              text-align: center;
-              font-size: 13px;
-            }
-            
-            /* Loan details table specific styling */
-            .loan-details-table th {
-              width: 25%;
-              text-align: center;
-              background-color: #e8e8e8;
-              font-size: 13px;
-            }
-            
-            .loan-details-table td {
-              width: 25%;
-              text-align: center;
-              font-size: 12px;
-            }
-            
-            /* Schedule table specific styling - ENHANCED */
-            .schedule-table th, 
-            .min-w-full th,
-            table th {
-              text-align: center !important;
-              font-size: 12px !important;
-              padding: 8px !important;
-              border: 1px solid #333 !important;
               background-color: #f5f5f5 !important;
-              white-space: nowrap !important;
+              font-weight: 600 !important;
+              font-size: 12px !important;
             }
             
-            .schedule-table td,
-            .min-w-full td,
-            table td {
-              text-align: center !important;
-              font-size: 11px !important;
-              padding: 6px !important;
-              border: 1px solid #333 !important;
-              white-space: nowrap !important;
-            }
+            /* Table Column Widths */
+            table th:nth-child(1), table td:nth-child(1) { width: 8% !important; }
+            table th:nth-child(2), table td:nth-child(2) { width: 12% !important; }
+            table th:nth-child(3), table td:nth-child(3) { width: 20% !important; }
+            table th:nth-child(4), table td:nth-child(4) { width: 20% !important; }
+            table th:nth-child(5), table td:nth-child(5) { width: 20% !important; }
+            table th:nth-child(6), table td:nth-child(6) { width: 20% !important; }
             
-            /* Ensure table cells don't break across pages */
-            .schedule-table tr,
-            .min-w-full tr,
-            table tr {
+            /* Row Styling */
+            tr {
               page-break-inside: avoid !important;
               break-inside: avoid !important;
             }
             
-            /* Remove min-width constraints in print */
-            .min-w-full {
-              min-width: auto !important;
-              width: 100% !important;
-              table-layout: fixed !important;
+            .bg-gray-50, .bg-gray-100 {
+              background-color: #f9f9f9 !important;
             }
             
-            /* Fix table cell widths for better layout */
-            table th:nth-child(1), table td:nth-child(1) { width: 8% !important; }  /* Month */
-            table th:nth-child(2), table td:nth-child(2) { width: 12% !important; } /* Date */
-            table th:nth-child(3), table td:nth-child(3) { width: 15% !important; } /* Payment */
-            table th:nth-child(4), table td:nth-child(4) { width: 15% !important; } /* Principal */
-            table th:nth-child(5), table td:nth-child(5) { width: 15% !important; } /* Interest */
-            table th:nth-child(6), table td:nth-child(6) { width: 20% !important; } /* Balance */
-            
-            /* Center all headings */
-            h1, h2, h3 {
+            /* Remove all Tailwind classes that interfere */
+            .text-left, .text-right {
               text-align: center !important;
-              margin: 20px 0;
-              width: 100%;
             }
             
-            h1 {
-              font-size: 26px;
-              color: #1f2937;
-              margin: 30px auto !important;
-              text-align: center !important;
-              width: 100% !important;
-              display: block !important;
-            }
-            
-            h2 {
-              font-size: 20px;
-              color: #374151;
-              margin: 25px auto 15px auto !important;
-              text-align: center !important;
-              width: 100% !important;
-              display: block !important;
-            }
-            
-            /* Center all divs and sections */
-            div, section {
-              text-align: center;
-            }
-            
-            /* Ensure full width for main containers */
-            .bg-white, .rounded-lg, .shadow-lg {
-              width: 100% !important;
-              max-width: 100% !important;
-              margin: 0 auto;
+            .px-4, .py-2, .p-6, .mb-8, .mb-4 {
+              padding: 4px !important;
+              margin: 0 !important;
             }
           }
         `}</style>
