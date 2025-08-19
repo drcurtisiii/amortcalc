@@ -132,6 +132,19 @@ function createARMLoanFields() {
 async function initializeWithLiveRates() {
     const rateStatusDiv = document.getElementById('rateStatus');
     
+    // Check if rate fetching service is available
+    if (!window.rateFetchingService || typeof window.rateFetchingService.getCurrentRates !== 'function') {
+        console.warn('Rate fetching service not available, using fallback rates');
+        if (rateStatusDiv) {
+            rateStatusDiv.innerHTML = '⚠️ Rate service unavailable - using fallback rates';
+            rateStatusDiv.style.backgroundColor = '#fef2f2';
+            rateStatusDiv.style.borderColor = '#ef4444';
+            rateStatusDiv.style.color = '#dc2626';
+        }
+        handleIndexChange(); // Use fallback rates
+        return;
+    }
+    
     try {
         // Show loading indicator
         const indexRateField = document.getElementById('indexRate');
@@ -147,7 +160,7 @@ async function initializeWithLiveRates() {
         }
         
         // Fetch current rates
-        const rates = await rateFetchingService.getCurrentRates();
+        const rates = await window.rateFetchingService.getCurrentRates();
         
         if (rates) {
             // Update the index options with live rates
@@ -234,42 +247,51 @@ function handleIndexChange() {
         customIndexField.style.display = 'none';
         customIndexRateField.style.display = 'none';
         
-        // Get rate from the rate fetching service if available
-        rateFetchingService.getCurrentRates().then(rates => {
-            let rate = null;
-            
-            switch(selectedIndex) {
-                case 'WSJ':
-                    rate = rates?.wsjPrime || 7.50;
-                    break;
-                case 'SOFR':
-                    rate = rates?.sofr || 5.32;
-                    break;
-                case 'Treasury':
-                    rate = rates?.treasury1Year || 4.85;
-                    break;
-                case 'LIBOR':
-                    rate = rates?.libor || 5.75;
-                    break;
-                default:
-                    rate = 5.00;
-            }
-            
-            indexRateField.value = rate.toFixed(2);
-            updateFullyIndexedRate();
-        }).catch(error => {
-            console.error('Failed to get current rate:', error);
-            // Fallback to hardcoded rates
-            const fallbackRates = {
-                'WSJ': 7.50,
-                'SOFR': 5.32,
-                'Treasury': 4.85,
-                'LIBOR': 5.75
-            };
-            
-            indexRateField.value = (fallbackRates[selectedIndex] || 5.00).toFixed(2);
-            updateFullyIndexedRate();
-        });
+        // Check if rate fetching service is available
+        if (window.rateFetchingService && typeof window.rateFetchingService.getCurrentRates === 'function') {
+            // Get rate from the rate fetching service if available
+            window.rateFetchingService.getCurrentRates().then(rates => {
+                let rate = null;
+                
+                switch(selectedIndex) {
+                    case 'WSJ':
+                        rate = rates?.wsjPrime || 7.50;
+                        break;
+                    case 'SOFR':
+                        rate = rates?.sofr || 5.32;
+                        break;
+                    case 'Treasury':
+                        rate = rates?.treasury1Year || 4.85;
+                        break;
+                    case 'LIBOR':
+                        rate = rates?.libor || 5.75;
+                        break;
+                    default:
+                        rate = 5.00;
+                }
+                
+                indexRateField.value = rate.toFixed(2);
+                updateFullyIndexedRate();
+            }).catch(error => {
+                console.error('Failed to get current rate:', error);
+                useFallbackRates();
+            });
+        } else {
+            useFallbackRates();
+        }
+    }
+    
+    function useFallbackRates() {
+        // Fallback to hardcoded rates
+        const fallbackRates = {
+            'WSJ': 7.50,
+            'SOFR': 5.32,
+            'Treasury': 4.85,
+            'LIBOR': 5.75
+        };
+        
+        indexRateField.value = (fallbackRates[selectedIndex] || 5.00).toFixed(2);
+        updateFullyIndexedRate();
     }
 }
 
