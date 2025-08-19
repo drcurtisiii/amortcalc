@@ -1,4 +1,24 @@
 {
+  "name": "amortization-calculator",
+  "version": "1.0.0",
+  "description": "Professional loan amortization calculator with live Federal Reserve data integration",
+  "main": "index.html",
+  "scripts": {
+    "build": "echo 'No build step required for static site'",
+    "start": "npx serve .",
+    "dev": "npx live-server ."
+  },
+  "keywords": [
+    "amortization",
+    "loan",
+    "calculator",
+    "mortgage",
+    "finance",
+    "legal"
+  ],
+  "author": "Curtis Law Firm",
+  "license": "UNLICENSED",
+  "private": true,
   "dependencies": {
     "lucide-react": "^0.539.0",
     "recharts": "^3.1.2"
