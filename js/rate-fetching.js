@@ -151,4 +151,6 @@ class RateFetchingService {
 }
 
 // Global instance
+console.log('Creating global rate fetching service...');
 window.rateFetchingService = new RateFetchingService();
+console.log('Rate fetching service created:', window.rateFetchingService);

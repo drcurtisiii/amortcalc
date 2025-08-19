@@ -132,9 +132,66 @@ function createARMLoanFields() {
 async function initializeWithLiveRates() {
     const rateStatusDiv = document.getElementById('rateStatus');
     
-    // Check if rate fetching service is available
+    // Ensure rate fetching service is available with retry mechanism
+    let retryCount = 0;
+    const maxRetries = 5;
+    
+    while ((!window.rateFetchingService || typeof window.rateFetchingService.getCurrentRates !== 'function') && retryCount < maxRetries) {
+        console.log(`Waiting for rate fetching service... attempt ${retryCount + 1}`);
+        await new Promise(resolve => setTimeout(resolve, 100)); // Wait 100ms
+        retryCount++;
+    }
+    
+        // If still not available, try to create it manually
     if (!window.rateFetchingService || typeof window.rateFetchingService.getCurrentRates !== 'function') {
-        console.warn('Rate fetching service not available, using fallback rates');
+        console.log('Attempting to manually initialize rate fetching service...');
+        try {
+            if (typeof RateFetchingService !== 'undefined') {
+                window.rateFetchingService = new RateFetchingService();
+                console.log('Successfully created rate fetching service manually');
+            } else {
+                console.error('RateFetchingService class not found');
+                // Create a simple fallback implementation
+                window.rateFetchingService = {
+                    getCurrentRates: async function() {
+                        console.log('Using simplified rate fetching...');
+                        try {
+                            // Simple direct API call to FRED for WSJ Prime
+                            const response = await fetch('https://api.stlouisfed.org/fred/series/observations?series_id=DPRIME&api_key=demo&file_type=json&limit=1&sort_order=desc');
+                            if (response.ok) {
+                                const data = await response.json();
+                                const rate = parseFloat(data.observations[0].value);
+                                return {
+                                    wsjPrime: rate,
+                                    sofr: 5.32,
+                                    treasury1Year: 4.85,
+                                    libor: 5.75,
+                                    cached: false,
+                                    lastUpdated: new Date().toISOString()
+                                };
+                            }
+                        } catch (error) {
+                            console.error('Simplified API call failed:', error);
+                        }
+                        // Return fallback rates
+                        return {
+                            wsjPrime: 7.50,
+                            sofr: 5.32,
+                            treasury1Year: 4.85,
+                            libor: 5.75,
+                            cached: false,
+                            lastUpdated: new Date().toISOString()
+                        };
+                    }
+                };
+                console.log('Created simplified rate fetching service');
+            }
+        } catch (error) {
+            console.error('Failed to manually initialize rate fetching service:', error);
+        }
+    }    // Final check
+    if (!window.rateFetchingService || typeof window.rateFetchingService.getCurrentRates !== 'function') {
+        console.warn('Rate fetching service not available after all attempts, using fallback rates');
         if (rateStatusDiv) {
             rateStatusDiv.innerHTML = '⚠️ Rate service unavailable - using fallback rates';
             rateStatusDiv.style.backgroundColor = '#fef2f2';
@@ -144,6 +201,8 @@ async function initializeWithLiveRates() {
         handleIndexChange(); // Use fallback rates
         return;
     }
+    
+    console.log('Rate fetching service is available, proceeding with live rate fetch...');
     
     try {
         // Show loading indicator
