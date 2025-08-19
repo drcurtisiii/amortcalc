@@ -85,6 +85,12 @@ body {
     gap: 0.5rem;
 }
 
+.title-icon {
+    height: 1.5em;
+    width: auto;
+    vertical-align: middle;
+}
+
 /* Input Groups */
 .input-group {
     margin-bottom: 1.5rem;
@@ -441,6 +447,10 @@ body {
     .title {
         font-size: 1.25rem;
         text-align: center;
+    }
+    
+    .title-icon {
+        height: 1.25em;
     }
     
     .loan-type-buttons {
