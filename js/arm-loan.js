@@ -1,5 +1,40 @@
 // Adjustable Rate Mortgage (ARM) Calculator
 
+// Simple rate fetching function - bypasses complex service issues
+async function fetchCurrentRates() {
+    console.log('Fetching current rates directly...');
+    try {
+        const response = await fetch('https://api.stlouisfed.org/fred/series/observations?series_id=DPRIME&api_key=demo&file_type=json&limit=1&sort_order=desc');
+        if (response.ok) {
+            const data = await response.json();
+            if (data.observations && data.observations.length > 0) {
+                const wsjRate = parseFloat(data.observations[0].value);
+                console.log('Successfully fetched WSJ Prime Rate:', wsjRate);
+                return {
+                    wsjPrime: wsjRate,
+                    sofr: 5.32,
+                    treasury1Year: 4.85,
+                    libor: 5.75,
+                    source: 'FRED API',
+                    lastUpdated: new Date().toISOString()
+                };
+            }
+        }
+    } catch (error) {
+        console.error('Rate fetch failed:', error);
+    }
+    
+    console.log('Using fallback rates');
+    return {
+        wsjPrime: 7.50,
+        sofr: 5.32,
+        treasury1Year: 4.85,
+        libor: 5.75,
+        source: 'Fallback',
+        lastUpdated: new Date().toISOString()
+    };
+}
+
 function createARMLoanFields() {
     const fieldsContainer = document.getElementById('inputFields');
     fieldsContainer.innerHTML = '';
@@ -119,7 +154,7 @@ function createARMLoanFields() {
     fieldsContainer.appendChild(rateStatusDiv);
     
     // Fetch live rates and initialize
-    initializeWithLiveRates();
+    initializeRatesAndDisplay();
     
     // Calculate initial values
     setTimeout(() => {
@@ -127,6 +162,96 @@ function createARMLoanFields() {
         handleIndexChange();
         calculateARMLoan();
     }, 100);
+}
+
+// Simplified rate initialization function
+async function initializeRatesAndDisplay() {
+    const rateStatusDiv = document.getElementById('rateStatus');
+    const indexRateField = document.getElementById('indexRate');
+    
+    console.log('Starting simplified rate initialization...');
+    
+    // Show loading state
+    if (indexRateField) {
+        indexRateField.value = 'Loading...';
+    }
+    
+    if (rateStatusDiv) {
+        rateStatusDiv.innerHTML = '🔄 Fetching current rates...';
+        rateStatusDiv.style.backgroundColor = '#fef3c7';
+        rateStatusDiv.style.borderColor = '#f59e0b';
+        rateStatusDiv.style.color = '#92400e';
+    }
+    
+    try {
+        // Fetch rates using simple direct function
+        const rates = await fetchCurrentRates();
+        
+        // Update index options with current rates
+        const armIndexSelect = document.getElementById('armIndex');
+        if (armIndexSelect && rates) {
+            const options = armIndexSelect.querySelectorAll('option');
+            options.forEach(option => {
+                const value = option.value;
+                let rate = null;
+                
+                switch(value) {
+                    case 'WSJ':
+                        rate = rates.wsjPrime;
+                        break;
+                    case 'SOFR':
+                        rate = rates.sofr;
+                        break;
+                    case 'Treasury':
+                        rate = rates.treasury1Year;
+                        break;
+                    case 'LIBOR':
+                        rate = rates.libor;
+                        break;
+                }
+                
+                if (rate !== null) {
+                    // Update option text with current rate
+                    const baseText = option.textContent.replace(/\s*\(.*?\).*$/, '');
+                    option.textContent = `${baseText} (${rate.toFixed(2)}%)`;
+                }
+            });
+        }
+        
+        // Update status indicator
+        if (rateStatusDiv) {
+            const source = rates.source === 'FRED API' ? 'live Federal Reserve data' : 'fallback rates';
+            const statusIcon = rates.source === 'FRED API' ? '✅' : '⚠️';
+            const timestamp = new Date(rates.lastUpdated).toLocaleString();
+            
+            rateStatusDiv.innerHTML = `${statusIcon} Using ${source} (updated: ${timestamp})`;
+            
+            if (rates.source === 'FRED API') {
+                rateStatusDiv.style.backgroundColor = '#dcfce7';
+                rateStatusDiv.style.borderColor = '#22c55e';
+                rateStatusDiv.style.color = '#166534';
+            } else {
+                rateStatusDiv.style.backgroundColor = '#fef2f2';
+                rateStatusDiv.style.borderColor = '#ef4444';
+                rateStatusDiv.style.color = '#dc2626';
+            }
+        }
+        
+        // Set initial index rate
+        handleIndexChange();
+        
+    } catch (error) {
+        console.error('Rate initialization failed:', error);
+        
+        if (rateStatusDiv) {
+            rateStatusDiv.innerHTML = '❌ Rate fetch failed - using fallback rates';
+            rateStatusDiv.style.backgroundColor = '#fef2f2';
+            rateStatusDiv.style.borderColor = '#ef4444';
+            rateStatusDiv.style.color = '#dc2626';
+        }
+        
+        handleIndexChange(); // Use fallback rates
+    }
 }
 
 async function initializeWithLiveRates() {
@@ -306,38 +431,33 @@ function handleIndexChange() {
         customIndexField.style.display = 'none';
         customIndexRateField.style.display = 'none';
         
-        // Check if rate fetching service is available
-        if (window.rateFetchingService && typeof window.rateFetchingService.getCurrentRates === 'function') {
-            // Get rate from the rate fetching service if available
-            window.rateFetchingService.getCurrentRates().then(rates => {
-                let rate = null;
-                
-                switch(selectedIndex) {
-                    case 'WSJ':
-                        rate = rates?.wsjPrime || 7.50;
-                        break;
-                    case 'SOFR':
-                        rate = rates?.sofr || 5.32;
-                        break;
-                    case 'Treasury':
-                        rate = rates?.treasury1Year || 4.85;
-                        break;
-                    case 'LIBOR':
-                        rate = rates?.libor || 5.75;
-                        break;
-                    default:
-                        rate = 5.00;
-                }
-                
-                indexRateField.value = rate.toFixed(2);
-                updateFullyIndexedRate();
-            }).catch(error => {
-                console.error('Failed to get current rate:', error);
-                useFallbackRates();
-            });
-        } else {
+        // Use simple rate fetching
+        fetchCurrentRates().then(rates => {
+            let rate = null;
+            
+            switch(selectedIndex) {
+                case 'WSJ':
+                    rate = rates?.wsjPrime || 7.50;
+                    break;
+                case 'SOFR':
+                    rate = rates?.sofr || 5.32;
+                    break;
+                case 'Treasury':
+                    rate = rates?.treasury1Year || 4.85;
+                    break;
+                case 'LIBOR':
+                    rate = rates?.libor || 5.75;
+                    break;
+                default:
+                    rate = 5.00;
+            }
+            
+            indexRateField.value = rate.toFixed(2);
+            updateFullyIndexedRate();
+        }).catch(error => {
+            console.error('Failed to get current rate:', error);
             useFallbackRates();
-        }
+        });
     }
     
     function useFallbackRates() {
