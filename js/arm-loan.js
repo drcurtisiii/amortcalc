@@ -62,36 +62,20 @@ function createARMLoanFields() {
         </ul>
     `;
     
+    console.log('Creating ARM loan fields...');
+    
     try {
         // Note: Borrower field (caseName) is already in the HTML, no need to create it dynamically
         
         // 1. Loan Amount  
-        const loanAmountField = createSynchronizedInputElement('loanAmount');
-        if (loanAmountField) {
-            fieldsContainer.appendChild(loanAmountField);
-            loanAmountField.querySelector('input').addEventListener('input', calculateARMLoan);
-        } else {
-            // Fallback: create field directly
-            const fallbackLoanAmount = createInputElement('loanAmount', 'number', 'Loan Amount ($)', window.sharedFieldValues?.loanAmount || 250000, '', 0, null, 1);
-            if (fallbackLoanAmount) {
-                fieldsContainer.appendChild(fallbackLoanAmount);
-                document.getElementById('loanAmount').addEventListener('input', calculateARMLoan);
-            }
-        }
+        const loanAmountField = createInputElement('loanAmount', 'number', 'Loan Amount ($)', 250000, '', 0, null, 1);
+        fieldsContainer.appendChild(loanAmountField);
+        document.getElementById('loanAmount').addEventListener('input', calculateARMLoan);
         
         // 2. Loan Term
-        const loanTermField = createSynchronizedInputElement('loanTerm');
-        if (loanTermField) {
-            fieldsContainer.appendChild(loanTermField);
-            loanTermField.querySelector('input').addEventListener('input', calculateARMLoan);
-        } else {
-            // Fallback: create field directly
-            const fallbackLoanTerm = createInputElement('loanTerm', 'number', 'Loan Term (years)', window.sharedFieldValues?.loanTerm || 30, '', 1, 50, 1);
-            if (fallbackLoanTerm) {
-                fieldsContainer.appendChild(fallbackLoanTerm);
-                document.getElementById('loanTerm').addEventListener('input', calculateARMLoan);
-            }
-        }
+        const loanTermField = createInputElement('loanTerm', 'number', 'Loan Term (years)', 30, '', 1, 50, 1);
+        fieldsContainer.appendChild(loanTermField);
+        document.getElementById('loanTerm').addEventListener('input', calculateARMLoan);
         
         // 3. ARM Index (dropdown with external links)
         const indexOptions = [
@@ -151,32 +135,14 @@ function createARMLoanFields() {
         document.getElementById('adjustmentPeriod').addEventListener('change', calculateARMLoan);
         
         // 10. Start Date
-        const startDateField = createSynchronizedInputElement('startDate');
-        if (startDateField) {
-            fieldsContainer.appendChild(startDateField);
-            startDateField.querySelector('input').addEventListener('input', calculateARMLoan);
-        } else {
-            // Fallback: create field directly
-            const fallbackStartDate = createInputElement('startDate', 'date', 'Start Date', window.sharedFieldValues?.startDate || new Date().toISOString().split('T')[0]);
-            if (fallbackStartDate) {
-                fieldsContainer.appendChild(fallbackStartDate);
-                document.getElementById('startDate').addEventListener('input', calculateARMLoan);
-            }
-        }
+        const startDateField = createInputElement('startDate', 'date', 'Start Date', new Date().toISOString().split('T')[0]);
+        fieldsContainer.appendChild(startDateField);
+        document.getElementById('startDate').addEventListener('input', calculateARMLoan);
         
         // 11. Extra Monthly Payment
-        const extraPaymentField = createSynchronizedInputElement('extraPayment');
-        if (extraPaymentField) {
-            fieldsContainer.appendChild(extraPaymentField);
-            extraPaymentField.querySelector('input').addEventListener('input', calculateARMLoan);
-        } else {
-            // Fallback: create field directly
-            const fallbackExtraPayment = createInputElement('extraPayment', 'number', 'Extra Monthly Payment ($)', window.sharedFieldValues?.extraPayment || 0, '', 0, null, 1);
-            if (fallbackExtraPayment) {
-                fieldsContainer.appendChild(fallbackExtraPayment);
-                document.getElementById('extraPayment').addEventListener('input', calculateARMLoan);
-            }
-        }
+        const extraPaymentField = createInputElement('extraPayment', 'number', 'Extra Monthly Payment ($)', 0, '', 0, null, 1);
+        fieldsContainer.appendChild(extraPaymentField);
+        document.getElementById('extraPayment').addEventListener('input', calculateARMLoan);
         
         // Create custom index input field (initially hidden)
         const customIndexField = createInputElement('customIndex', 'text', 'Custom Index Name', '', 'e.g., Bank Prime Rate, Custom Rate, etc.');
@@ -184,6 +150,8 @@ function createARMLoanFields() {
         customIndexField.id = 'customIndexField';
         fieldsContainer.appendChild(customIndexField);
         document.getElementById('customIndex').addEventListener('input', calculateARMLoan);
+        
+        console.log('All ARM fields created successfully');
         
         // Initialize calculations
         setTimeout(() => {
