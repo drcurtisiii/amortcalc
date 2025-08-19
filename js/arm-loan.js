@@ -39,60 +39,79 @@ function createARMLoanFields() {
     const fieldsContainer = document.getElementById('inputFields');
     fieldsContainer.innerHTML = '';
     
-    // Create synchronized input fields
+    // Create synchronized input fields in the specified order
     const marginInfoText = `
         <h4>What is "Margin" in ARM loans?</h4>
         <p><strong>Margin</strong> is a fixed percentage that the lender adds to an index rate to determine your adjustable interest rate after the initial fixed period ends.</p>
         
         <h4>Formula:</h4>
-        <p><strong>New Rate = Index Rate + Margin</strong></p>
+        <p><strong>Fully Indexed Rate = Current Index Rate + Margin</strong></p>
         
         <h4>Example:</h4>
         <ul>
-            <li>Index rate (like 1-year Treasury): 3.5%</li>
+            <li>Current Index Rate: 3.5%</li>
             <li>Margin: 2.5%</li>
-            <li>Your new rate: 3.5% + 2.5% = <strong>6.0%</strong></li>
+            <li>Fully Indexed Rate: 3.5% + 2.5% = <strong>6.0%</strong></li>
         </ul>
         
         <h4>Key Points:</h4>
         <ul>
             <li>The margin <strong>never changes</strong> during the life of the loan</li>
-            <li>It's set at closing and remains constant</li>
             <li>Only the <strong>index rate fluctuates</strong> with market conditions</li>
             <li>Your payment adjusts based on the new rate + remaining balance</li>
         </ul>
     `;
     
-    const fields = [
-        createSynchronizedInputElement('loanAmount'),
-        createSynchronizedInputElement('interestRate', null, 'Fully Indexed Rate (%)'),
-        createSynchronizedInputElement('loanTerm'),
-        createInputElement('margin', 'number', 'Margin/Spread (%)', 2.5, '', 0, 10, 0.125, marginInfoText),
-        createInputElement('lifetimeCap', 'number', 'Lifetime Cap (%)', 5, '', 0, 20, 0.5),
-        createSynchronizedInputElement('startDate'),
-        createSynchronizedInputElement('extraPayment')
-    ];
+    // 1. Borrower
+    const borrowerField = createSynchronizedInputElement('borrower');
+    fieldsContainer.appendChild(borrowerField);
     
-    fields.forEach(field => {
-        if (field) {
-            fieldsContainer.appendChild(field);
-            const input = field.querySelector('input');
-            if (input.id === 'margin') {
-                input.addEventListener('input', updateFullyIndexedRate);
-            } else {
-                input.addEventListener('input', calculateARMLoan);
-            }
-        }
-    });
+    // 2. Loan Amount  
+    const loanAmountField = createSynchronizedInputElement('loanAmount');
+    fieldsContainer.appendChild(loanAmountField);
+    loanAmountField.querySelector('input').addEventListener('input', calculateARMLoan);
     
-    // Create select fields - start with placeholder rates, will be updated by API
+    // 3. Loan Term
+    const loanTermField = createSynchronizedInputElement('loanTerm');
+    fieldsContainer.appendChild(loanTermField);
+    loanTermField.querySelector('input').addEventListener('input', calculateARMLoan);
+    
+    // 4. ARM Index (dropdown with external links)
     const indexOptions = [
-        { value: 'WSJ', text: 'WSJ Prime Rate', currentRate: 7.50 },
-        { value: 'SOFR', text: 'SOFR', currentRate: 5.32 },
-        { value: 'Treasury', text: 'US Treasury (1-Year)', currentRate: 4.85 },
-        { value: 'LIBOR', text: 'LIBOR (Legacy)', currentRate: 5.75 },
-        { value: 'Other', text: 'Other (Custom)', currentRate: 0 }
+        { value: '', text: 'Select One' },
+        { value: 'WSJ', text: 'WSJ Prime Rate', url: 'https://www.wsj.com/market-data/bonds/moneyrates' },
+        { value: 'SOFR', text: 'SOFR', url: 'https://www.newyorkfed.org/markets/reference-rates/sofr' },
+        { value: 'Treasury', text: '1-Year Treasury', url: 'https://www.treasury.gov/resource-center/data-chart-center/interest-rates/pages/textview.aspx?data=yield' },
+        { value: 'LIBOR', text: 'LIBOR (Legacy)', url: 'https://www.ice.com/iba/libor' },
+        { value: 'Other', text: 'Other (Custom)' }
     ];
+    const indexField = createSelectElement('armIndex', 'ARM Index', indexOptions, '');
+    fieldsContainer.appendChild(indexField);
+    document.getElementById('armIndex').addEventListener('change', handleIndexChange);
+    
+    // 5. Current Index Rate
+    const indexRateField = createInputElement('indexRate', 'number', 'Current Index Rate (%)', '', 'Enter the current rate from your selected index', 0, 50, 0.01);
+    fieldsContainer.appendChild(indexRateField);
+    document.getElementById('indexRate').addEventListener('input', updateFullyIndexedRate);
+    
+    // 6. Margin/Spread
+    const marginField = createInputElement('margin', 'number', 'Margin/Spread (%)', 2.5, '', 0, 10, 0.125, marginInfoText);
+    fieldsContainer.appendChild(marginField);
+    document.getElementById('margin').addEventListener('input', updateFullyIndexedRate);
+    
+    // 7. Fully Indexed Rate (calculated, read-only)
+    const fullyIndexedRateField = createInputElement('fullyIndexedRate', 'number', 'Fully Indexed Rate (%)', '', 'Automatically calculated: Index Rate + Margin', 0, 50, 0.01);
+    fullyIndexedRateField.querySelector('input').readOnly = true;
+    fullyIndexedRateField.querySelector('input').style.backgroundColor = '#f1f5f9';
+    fullyIndexedRateField.querySelector('input').style.fontWeight = 'bold';
+    fieldsContainer.appendChild(fullyIndexedRateField);
+    
+    // 8. Lifetime Cap
+    const lifetimeCapField = createInputElement('lifetimeCap', 'number', 'Lifetime Cap (%)', 5, '', 0, 20, 0.5);
+    fieldsContainer.appendChild(lifetimeCapField);
+    document.getElementById('lifetimeCap').addEventListener('input', calculateARMLoan);
+    
+    // 9. Fixed Rate Period
     const fixedPeriodOptions = [
         { value: 1, text: '1 Year' },
         { value: 2, text: '2 Years' },
@@ -105,30 +124,7 @@ function createARMLoanFields() {
     fieldsContainer.appendChild(fixedPeriodField);
     document.getElementById('fixedPeriod').addEventListener('change', calculateARMLoan);
     
-    const indexField = createSelectElement('armIndex', 'ARM Index', indexOptions, 'WSJ');
-    fieldsContainer.appendChild(indexField);
-    document.getElementById('armIndex').addEventListener('change', handleIndexChange);
-    
-    // Add index rate display field (read-only) - will show live rates
-    const indexRateField = createInputElement('indexRate', 'number', 'Current Index Rate (%)', 7.50, '', 0, 50, 0.01);
-    indexRateField.querySelector('input').readOnly = true;
-    indexRateField.querySelector('input').style.backgroundColor = '#f1f5f9';
-    fieldsContainer.appendChild(indexRateField);
-    
-    // Create custom index input field (initially hidden)
-    const customIndexField = createInputElement('customIndex', 'text', 'Custom Index Name', '', 'e.g., CCBG Rate, ABC Bank LOC Rate, etc.');
-    customIndexField.style.display = 'none';
-    customIndexField.id = 'customIndexField';
-    fieldsContainer.appendChild(customIndexField);
-    document.getElementById('customIndex').addEventListener('input', calculateARMLoan);
-    
-    // Add custom index rate field (initially hidden)
-    const customIndexRateField = createInputElement('customIndexRate', 'number', 'Custom Index Rate (%)', 6.0, '', 0, 50, 0.01);
-    customIndexRateField.style.display = 'none';
-    customIndexRateField.id = 'customIndexRateField';
-    fieldsContainer.appendChild(customIndexRateField);
-    document.getElementById('customIndexRate').addEventListener('input', updateFullyIndexedRate);
-    
+    // 10. Adjustment Period
     const adjustmentOptions = [
         { value: 6, text: '6 Months' },
         { value: 12, text: '1 Year' }
@@ -137,29 +133,21 @@ function createARMLoanFields() {
     fieldsContainer.appendChild(adjustmentField);
     document.getElementById('adjustmentPeriod').addEventListener('change', calculateARMLoan);
     
-    // Add rate status indicator
-    const rateStatusDiv = document.createElement('div');
-    rateStatusDiv.id = 'rateStatus';
-    rateStatusDiv.style.cssText = `
-        margin-top: 10px;
-        padding: 8px 12px;
-        background-color: #f1f5f9;
-        border-radius: 6px;
-        font-size: 12px;
-        color: #64748b;
-        text-align: center;
-        border: 1px solid #e2e8f0;
-    `;
-    rateStatusDiv.innerHTML = 'Loading current rates...';
-    fieldsContainer.appendChild(rateStatusDiv);
+    // 11. Extra Monthly Payment
+    const extraPaymentField = createSynchronizedInputElement('extraPayment');
+    fieldsContainer.appendChild(extraPaymentField);
+    extraPaymentField.querySelector('input').addEventListener('input', calculateARMLoan);
     
-    // Fetch live rates and initialize
-    initializeRatesAndDisplay();
+    // Create custom index input field (initially hidden)
+    const customIndexField = createInputElement('customIndex', 'text', 'Custom Index Name', '', 'e.g., Bank Prime Rate, Custom Rate, etc.');
+    customIndexField.style.display = 'none';
+    customIndexField.id = 'customIndexField';
+    fieldsContainer.appendChild(customIndexField);
+    document.getElementById('customIndex').addEventListener('input', calculateARMLoan);
     
-    // Calculate initial values
+    // Initialize calculations
     setTimeout(() => {
-        // Initialize index rate and fully indexed rate
-        handleIndexChange();
+        updateFullyIndexedRate();
         calculateARMLoan();
     }, 100);
 }
@@ -415,87 +403,64 @@ function handleIndexChange() {
     const indexSelect = document.getElementById('armIndex');
     const indexRateField = document.getElementById('indexRate');
     const customIndexField = document.getElementById('customIndexField');
-    const customIndexRateField = document.getElementById('customIndexRateField');
     
     if (!indexSelect || !indexRateField) return;
     
     const selectedIndex = indexSelect.value;
     
-    if (selectedIndex === 'Other') {
-        // Show custom fields
-        customIndexField.style.display = 'block';
-        customIndexRateField.style.display = 'block';
-        indexRateField.value = document.getElementById('customIndexRate')?.value || 6.0;
-    } else {
-        // Hide custom fields
+    // Define URLs for external rate sources
+    const rateUrls = {
+        'WSJ': 'https://www.wsj.com/market-data/bonds/moneyrates',
+        'SOFR': 'https://www.newyorkfed.org/markets/reference-rates/sofr',
+        'Treasury': 'https://www.treasury.gov/resource-center/data-chart-center/interest-rates/pages/textview.aspx?data=yield',
+        'LIBOR': 'https://www.ice.com/iba/libor'
+    };
+    
+    if (selectedIndex === '') {
+        // Select One - clear the rate field
+        indexRateField.value = '';
         customIndexField.style.display = 'none';
-        customIndexRateField.style.display = 'none';
+    } else if (selectedIndex === 'Other') {
+        // Show custom index field
+        customIndexField.style.display = 'block';
+        indexRateField.placeholder = 'Enter custom index rate';
+    } else {
+        // Hide custom field
+        customIndexField.style.display = 'none';
         
-        // Use simple rate fetching
-        fetchCurrentRates().then(rates => {
-            let rate = null;
+        // Open external URL in new tab for rate lookup
+        if (rateUrls[selectedIndex]) {
+            window.open(rateUrls[selectedIndex], '_blank');
             
-            switch(selectedIndex) {
-                case 'WSJ':
-                    rate = rates?.wsjPrime || 7.50;
-                    break;
-                case 'SOFR':
-                    rate = rates?.sofr || 5.32;
-                    break;
-                case 'Treasury':
-                    rate = rates?.treasury1Year || 4.85;
-                    break;
-                case 'LIBOR':
-                    rate = rates?.libor || 5.75;
-                    break;
-                default:
-                    rate = 5.00;
-            }
+            // Show helpful message
+            indexRateField.placeholder = `Enter current ${indexSelect.options[indexSelect.selectedIndex].text} from the opened page`;
             
-            indexRateField.value = rate.toFixed(2);
-            updateFullyIndexedRate();
-        }).catch(error => {
-            console.error('Failed to get current rate:', error);
-            useFallbackRates();
-        });
+            // Clear the field so user enters fresh rate
+            indexRateField.value = '';
+        }
     }
     
-    function useFallbackRates() {
-        // Fallback to hardcoded rates
-        const fallbackRates = {
-            'WSJ': 7.50,
-            'SOFR': 5.32,
-            'Treasury': 4.85,
-            'LIBOR': 5.75
-        };
-        
-        indexRateField.value = (fallbackRates[selectedIndex] || 5.00).toFixed(2);
-        updateFullyIndexedRate();
-    }
+    updateFullyIndexedRate();
 }
 
 function updateFullyIndexedRate() {
-    const indexSelect = document.getElementById('armIndex');
-    const marginInput = document.getElementById('margin');
-    const interestRateInput = document.getElementById('interestRate');
+    const indexRateField = document.getElementById('indexRate');
+    const marginField = document.getElementById('margin');
+    const fullyIndexedRateField = document.getElementById('fullyIndexedRate');
     
-    let indexRate = 0;
-    if (indexSelect.value === 'Other') {
-        indexRate = parseFloat(document.getElementById('customIndexRate')?.value || 0);
-    } else {
-        indexRate = parseFloat(document.getElementById('indexRate')?.value || 0);
-    }
+    if (!indexRateField || !marginField || !fullyIndexedRateField) return;
     
-    const margin = parseFloat(marginInput?.value || 0);
+    const indexRate = parseFloat(indexRateField.value) || 0;
+    const margin = parseFloat(marginField.value) || 0;
     const fullyIndexedRate = indexRate + margin;
     
-    if (interestRateInput) {
-        interestRateInput.value = fullyIndexedRate.toFixed(3);
-        // Trigger synchronization
-        interestRateInput.dispatchEvent(new Event('input', { bubbles: true }));
-    }
+    // Update the fully indexed rate field
+    fullyIndexedRateField.value = fullyIndexedRate.toFixed(3);
     
-    // Recalculate after rate change
+    // Sync this rate to the shared interest rate field for other tabs
+    synchronizeField('interestRate', fullyIndexedRate.toFixed(3));
+    
+    // Trigger recalculation
     calculateARMLoan();
 }
 
