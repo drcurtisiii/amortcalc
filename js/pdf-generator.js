@@ -127,6 +127,53 @@ function addSummaryTable(doc, summary, margin, contentWidth, yPos) {
         ['Payoff Date:', summary.payoffDate || 'N/A']
     ];
     
+    // Add ARM-specific fields if current loan type is ARM
+    if (currentLoanType === 'arm') {
+        const armIndexElement = document.getElementById('armIndex');
+        const fullyIndexedRateElement = document.getElementById('fullyIndexedRate');
+        const fixedPeriodElement = document.getElementById('fixedPeriod');
+        const adjustmentPeriodElement = document.getElementById('adjustmentPeriod');
+        
+        // Get ARM Index display text
+        let armIndexText = 'Not Specified';
+        if (armIndexElement && armIndexElement.value) {
+            if (armIndexElement.value === 'Other') {
+                const customIndexElement = document.getElementById('customIndex');
+                armIndexText = customIndexElement?.value || 'Custom Index';
+            } else {
+                armIndexText = armIndexElement.options[armIndexElement.selectedIndex]?.text || armIndexElement.value;
+            }
+        }
+        
+        // Get fully indexed rate
+        let fullyIndexedRate = 'Not Specified';
+        if (fullyIndexedRateElement && fullyIndexedRateElement.value) {
+            fullyIndexedRate = fullyIndexedRateElement.value + '%';
+        }
+        
+        // Get fixed rate period
+        let fixedPeriod = 'Not Specified';
+        if (fixedPeriodElement && fixedPeriodElement.value) {
+            const years = fixedPeriodElement.value;
+            fixedPeriod = years === '1' ? '1 Year' : `${years} Years`;
+        }
+        
+        // Get adjustment period
+        let adjustmentPeriod = 'Not Specified';
+        if (adjustmentPeriodElement && adjustmentPeriodElement.value) {
+            const months = adjustmentPeriodElement.value;
+            adjustmentPeriod = months === '6' ? '6 Months' : '1 Year';
+        }
+        
+        // Insert ARM-specific fields after loan type
+        tableData.splice(4, 0, 
+            ['ARM Index:', armIndexText],
+            ['Fully Indexed Rate:', fullyIndexedRate],
+            ['Fixed Rate Period:', fixedPeriod],
+            ['Adjustment Period:', adjustmentPeriod]
+        );
+    }
+    
     // Table dimensions
     const tableWidth = contentWidth; // Stretch table to full width (margins)
     const tableX = margin; // Start table at left margin
