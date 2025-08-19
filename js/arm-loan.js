@@ -511,7 +511,7 @@ function calculateARMLoan() {
     if (tableHeader && !tableHeader.querySelector('.rate-header')) {
         const rateHeader = document.createElement('th');
         rateHeader.textContent = 'Rate';
-        rateHeader.className = 'rate-header';
+        rateHeader.className = 'rate-header text-right';
         tableHeader.appendChild(rateHeader);
     }
 }
@@ -546,25 +546,9 @@ function generateARMAmortizationSchedule(principal, initialRate, months, startDa
     let basePayment = calculateMonthlyPayment(principal, initialRate, months);
     
     for (let month = 1; month <= months && balance > 0; month++) {
-        // Handle ARM rate adjustments
-        if (month > armSettings.fixedMonths) {
-            const adjustmentPeriod = armSettings.adjustmentMonths;
-            if ((month - armSettings.fixedMonths - 1) % adjustmentPeriod === 0) {
-                // Simulate rate change (in real app, this would be based on index + margin)
-                const rateChange = (Math.random() - 0.5) * 2; // Random change between -1% and +1%
-                currentRate = Math.max(
-                    0.25, // Minimum rate
-                    Math.min(
-                        currentRate + rateChange,
-                        armSettings.initialRate + armSettings.lifetimeCap
-                    )
-                );
-                
-                // Recalculate payment with new rate and remaining balance/term
-                const remainingMonths = months - month + 1;
-                basePayment = calculateMonthlyPayment(balance, currentRate, remainingMonths);
-            }
-        }
+        // For ARM loans, maintain the fully indexed rate throughout
+        // We cannot predict future rate changes, so use the current fully indexed rate for all calculations
+        // This provides a realistic payment schedule based on current market conditions
         
         const monthlyRate = currentRate / 100 / 12;
         const interestPayment = balance * monthlyRate;
