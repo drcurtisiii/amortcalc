@@ -49,82 +49,140 @@ function createARMLoanFields() {
         
         <h4>Example:</h4>
         <ul>
-            <li>Current Index Rate: 3.5%</li>
+            <li>Current WSJ Prime Rate: 7.5%</li>
             <li>Margin: 2.5%</li>
-            <li>Fully Indexed Rate: 3.5% + 2.5% = <strong>6.0%</strong></li>
+            <li>Fully Indexed Rate: 10.0%</li>
         </ul>
         
         <h4>Key Points:</h4>
         <ul>
-            <li>The margin <strong>never changes</strong> during the life of the loan</li>
+            <li>The margin <strong>never changes</strong> during the loan term</li>
             <li>Only the <strong>index rate fluctuates</strong> with market conditions</li>
             <li>Your payment adjusts based on the new rate + remaining balance</li>
         </ul>
     `;
     
-    // 1. Borrower
-    const borrowerField = createSynchronizedInputElement('caseName');
-    fieldsContainer.appendChild(borrowerField);
-    
-    // 2. Loan Amount  
-    const loanAmountField = createSynchronizedInputElement('loanAmount');
-    fieldsContainer.appendChild(loanAmountField);
-    loanAmountField.querySelector('input').addEventListener('input', calculateARMLoan);
-    
-    // 3. Loan Term
-    const loanTermField = createSynchronizedInputElement('loanTerm');
-    fieldsContainer.appendChild(loanTermField);
-    loanTermField.querySelector('input').addEventListener('input', calculateARMLoan);
-    
-    // 4. ARM Index (dropdown with external links)
-    const indexOptions = [
-        { value: '', text: 'Select One' },
-        { value: 'WSJ', text: 'WSJ Prime Rate', url: 'https://www.wsj.com/market-data/bonds/moneyrates' },
-        { value: 'SOFR', text: 'SOFR', url: 'https://www.newyorkfed.org/markets/reference-rates/sofr' },
-        { value: 'Treasury', text: '1-Year Treasury', url: 'https://www.treasury.gov/resource-center/data-chart-center/interest-rates/pages/textview.aspx?data=yield' },
-        { value: 'LIBOR', text: 'LIBOR (Legacy)', url: 'https://www.ice.com/iba/libor' },
-        { value: 'Other', text: 'Other (Custom)' }
-    ];
-    const indexField = createSelectElement('armIndex', 'ARM Index', indexOptions, '');
-    fieldsContainer.appendChild(indexField);
-    document.getElementById('armIndex').addEventListener('change', handleIndexChange);
-    
-    // 5. Current Index Rate
-    const indexRateField = createInputElement('indexRate', 'number', 'Current Index Rate (%)', '', 'Enter the current rate from your selected index', 0, 50, 0.01);
-    fieldsContainer.appendChild(indexRateField);
-    document.getElementById('indexRate').addEventListener('input', updateFullyIndexedRate);
-    
-    // 6. Margin/Spread
-    const marginField = createInputElement('margin', 'number', 'Margin/Spread (%)', 2.5, '', 0, 10, 0.125, marginInfoText);
-    fieldsContainer.appendChild(marginField);
-    document.getElementById('margin').addEventListener('input', updateFullyIndexedRate);
-    
-    // 7. Fully Indexed Rate (calculated, read-only)
-    const fullyIndexedRateField = createInputElement('fullyIndexedRate', 'number', 'Fully Indexed Rate (%)', '', 'Automatically calculated: Index Rate + Margin', 0, 50, 0.01);
-    fullyIndexedRateField.querySelector('input').readOnly = true;
-    fullyIndexedRateField.querySelector('input').style.backgroundColor = '#f1f5f9';
-    fullyIndexedRateField.querySelector('input').style.fontWeight = 'bold';
-    fieldsContainer.appendChild(fullyIndexedRateField);
-    
-    // 8. Lifetime Cap
-    const lifetimeCapField = createInputElement('lifetimeCap', 'number', 'Lifetime Cap (%)', 5, '', 0, 20, 0.5);
-    fieldsContainer.appendChild(lifetimeCapField);
-    document.getElementById('lifetimeCap').addEventListener('input', calculateARMLoan);
-    
-    // 9. Fixed Rate Period
-    const fixedPeriodOptions = [
-        { value: 1, text: '1 Year' },
-        { value: 2, text: '2 Years' },
-        { value: 3, text: '3 Years' },
-        { value: 5, text: '5 Years' },
-        { value: 7, text: '7 Years' },
-        { value: 10, text: '10 Years' }
-    ];
-    const fixedPeriodField = createSelectElement('fixedPeriod', 'Fixed Rate Period', fixedPeriodOptions, 5);
-    fieldsContainer.appendChild(fixedPeriodField);
-    document.getElementById('fixedPeriod').addEventListener('change', calculateARMLoan);
-    
-    // 10. Adjustment Period
+    try {
+        // 1. Borrower
+        const borrowerField = createSynchronizedInputElement('caseName');
+        if (borrowerField) {
+            fieldsContainer.appendChild(borrowerField);
+        } else {
+            // Fallback: create field directly
+            const fallbackBorrower = createInputElement('caseName', 'text', 'Borrower(s)', document.getElementById('caseName')?.value || '');
+            fieldsContainer.appendChild(fallbackBorrower);
+        }
+        
+        // 2. Loan Amount  
+        const loanAmountField = createSynchronizedInputElement('loanAmount');
+        if (loanAmountField) {
+            fieldsContainer.appendChild(loanAmountField);
+            loanAmountField.querySelector('input').addEventListener('input', calculateARMLoan);
+        } else {
+            // Fallback: create field directly
+            const fallbackLoanAmount = createInputElement('loanAmount', 'number', 'Loan Amount ($)', 250000, '', 0, null, 1);
+            fieldsContainer.appendChild(fallbackLoanAmount);
+            document.getElementById('loanAmount').addEventListener('input', calculateARMLoan);
+        }
+        
+        // 3. Loan Term
+        const loanTermField = createSynchronizedInputElement('loanTerm');
+        if (loanTermField) {
+            fieldsContainer.appendChild(loanTermField);
+            loanTermField.querySelector('input').addEventListener('input', calculateARMLoan);
+        } else {
+            // Fallback: create field directly
+            const fallbackLoanTerm = createInputElement('loanTerm', 'number', 'Loan Term (years)', 30, '', 1, 50, 1);
+            fieldsContainer.appendChild(fallbackLoanTerm);
+            document.getElementById('loanTerm').addEventListener('input', calculateARMLoan);
+        }
+        
+        // 4. ARM Index (dropdown with external links)
+        const indexOptions = [
+            { value: '', text: 'Select One' },
+            { value: 'WSJ', text: 'WSJ Prime Rate', url: 'https://www.wsj.com/market-data/bonds/moneyrates' },
+            { value: 'SOFR', text: 'SOFR', url: 'https://www.newyorkfed.org/markets/reference-rates/sofr' },
+            { value: 'Treasury', text: '1-Year Treasury', url: 'https://www.treasury.gov/resource-center/data-chart-center/interest-rates/pages/textview.aspx?data=yield' },
+            { value: 'LIBOR', text: 'LIBOR (Legacy)', url: 'https://www.ice.com/iba/libor' },
+            { value: 'Other', text: 'Other (Custom)' }
+        ];
+        const indexField = createSelectElement('armIndex', 'ARM Index', indexOptions, '');
+        fieldsContainer.appendChild(indexField);
+        document.getElementById('armIndex').addEventListener('change', handleIndexChange);
+        
+        // 5. Current Index Rate
+        const indexRateField = createInputElement('indexRate', 'number', 'Current Index Rate (%)', '', 'Enter the current rate from your selected index', 0, 50, 0.01);
+        fieldsContainer.appendChild(indexRateField);
+        document.getElementById('indexRate').addEventListener('input', updateFullyIndexedRate);
+        
+        // 6. Margin/Spread
+        const marginField = createInputElement('margin', 'number', 'Margin/Spread (%)', 2.5, '', 0, 10, 0.125, marginInfoText);
+        fieldsContainer.appendChild(marginField);
+        document.getElementById('margin').addEventListener('input', updateFullyIndexedRate);
+        
+        // 7. Fully Indexed Rate (calculated, read-only)
+        const fullyIndexedRateField = createInputElement('fullyIndexedRate', 'number', 'Fully Indexed Rate (%)', '', 'Automatically calculated: Index Rate + Margin', 0, 50, 0.01);
+        fullyIndexedRateField.querySelector('input').readOnly = true;
+        fullyIndexedRateField.querySelector('input').style.backgroundColor = '#f1f5f9';
+        fullyIndexedRateField.querySelector('input').style.fontWeight = 'bold';
+        fieldsContainer.appendChild(fullyIndexedRateField);
+        
+        // 8. Lifetime Cap
+        const lifetimeCapField = createInputElement('lifetimeCap', 'number', 'Lifetime Cap (%)', 5, '', 0, 20, 0.5);
+        fieldsContainer.appendChild(lifetimeCapField);
+        document.getElementById('lifetimeCap').addEventListener('input', calculateARMLoan);
+        
+        // 9. Fixed Rate Period
+        const fixedPeriodOptions = [
+            { value: 1, text: '1 Year' },
+            { value: 2, text: '2 Years' },
+            { value: 3, text: '3 Years' },
+            { value: 5, text: '5 Years' },
+            { value: 7, text: '7 Years' },
+            { value: 10, text: '10 Years' }
+        ];
+        const fixedPeriodField = createSelectElement('fixedPeriod', 'Fixed Rate Period', fixedPeriodOptions, 5);
+        fieldsContainer.appendChild(fixedPeriodField);
+        document.getElementById('fixedPeriod').addEventListener('change', calculateARMLoan);
+        
+        // 10. Adjustment Period
+        const adjustmentOptions = [
+            { value: 6, text: '6 Months' },
+            { value: 12, text: '1 Year' }
+        ];
+        const adjustmentField = createSelectElement('adjustmentPeriod', 'Adjustment Period', adjustmentOptions, 12);
+        fieldsContainer.appendChild(adjustmentField);
+        document.getElementById('adjustmentPeriod').addEventListener('change', calculateARMLoan);
+        
+        // 11. Extra Monthly Payment
+        const extraPaymentField = createSynchronizedInputElement('extraPayment');
+        if (extraPaymentField) {
+            fieldsContainer.appendChild(extraPaymentField);
+            extraPaymentField.querySelector('input').addEventListener('input', calculateARMLoan);
+        } else {
+            // Fallback: create field directly
+            const fallbackExtraPayment = createInputElement('extraPayment', 'number', 'Extra Monthly Payment ($)', 0, '', 0, null, 1);
+            fieldsContainer.appendChild(fallbackExtraPayment);
+            document.getElementById('extraPayment').addEventListener('input', calculateARMLoan);
+        }
+        
+        // Create custom index input field (initially hidden)
+        const customIndexField = createInputElement('customIndex', 'text', 'Custom Index Name', '', 'e.g., Bank Prime Rate, Custom Rate, etc.');
+        customIndexField.style.display = 'none';
+        customIndexField.id = 'customIndexField';
+        fieldsContainer.appendChild(customIndexField);
+        document.getElementById('customIndex').addEventListener('input', calculateARMLoan);
+        
+        // Initialize calculations
+        setTimeout(() => {
+            updateFullyIndexedRate();
+            calculateARMLoan();
+        }, 100);
+        
+    } catch (error) {
+        console.error('Error creating ARM loan fields:', error);
+    }
+}
     const adjustmentOptions = [
         { value: 6, text: '6 Months' },
         { value: 12, text: '1 Year' }
