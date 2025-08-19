@@ -1,0 +1,124 @@
+// Balloon Loan Calculator
+
+function createBalloonLoanFields() {
+    const fieldsContainer = document.getElementById('inputFields');
+    fieldsContainer.innerHTML = '';
+    
+    // Create synchronized input fields
+    const fields = [
+        createSynchronizedInputElement('loanAmount'),
+        createSynchronizedInputElement('interestRate'),
+        createSynchronizedInputElement('amortizationPeriod'),
+        createInputElement('balloonTerm', 'number', 'Balloon Term (years)', 5, '', 1, 30, 1),
+        createSynchronizedInputElement('startDate'),
+        createSynchronizedInputElement('extraPayment')
+    ];
+    
+    fields.forEach(field => {
+        if (field) {
+            fieldsContainer.appendChild(field);
+            const input = field.querySelector('input');
+            input.addEventListener('input', calculateBalloonLoan);
+        }
+    });
+    
+    // Add interest-only checkbox
+    const checkboxField = createCheckboxElement('isInterestOnly', 'Interest Only Payments', false);
+    fieldsContainer.appendChild(checkboxField);
+    document.getElementById('isInterestOnly').addEventListener('change', calculateBalloonLoan);
+    
+    // Calculate initial values
+    setTimeout(calculateBalloonLoan, 100);
+}
+
+function calculateBalloonLoan() {
+    const values = getBalloonFormValues();
+    
+    if (!values.loanAmount || !values.interestRate || !values.balloonTerm || !values.amortizationPeriod) {
+        return;
+    }
+    
+    const schedule = generateBalloonAmortizationSchedule(
+        values.loanAmount,
+        values.interestRate,
+        values.amortizationPeriod * 12,
+        values.startDate,
+        values.extraPayment,
+        values.balloonTerm * 12,
+        values.isInterestOnly
+    );
+    
+    currentSchedule = schedule;
+    updateSummary(schedule);
+    updateChart(schedule);
+    updateScheduleTable(schedule);
+}
+
+function getBalloonFormValues() {
+    return {
+        loanAmount: getNumericValue('loanAmount'),
+        interestRate: parseFloat(document.getElementById('interestRate')?.value || 0),
+        balloonTerm: parseInt(document.getElementById('balloonTerm')?.value || 0),
+        amortizationPeriod: parseInt(document.getElementById('amortizationPeriod')?.value || 0),
+        isInterestOnly: document.getElementById('isInterestOnly')?.checked || false,
+        startDate: document.getElementById('startDate')?.value || new Date().toISOString().split('T')[0],
+        extraPayment: getNumericValue('extraPayment')
+    };
+}
+
+function generateBalloonAmortizationSchedule(principal, annualRate, amortizationMonths, startDate, extraPayment = 0, balloonTerm = 60, isInterestOnly = false) {
+    const schedule = [];
+    let balance = principal;
+    const monthlyRate = annualRate / 100 / 12;
+    let currentDate = new Date(startDate);
+    let totalInterest = 0;
+    let totalPrincipal = 0;
+    
+    // Calculate base monthly payment
+    let basePayment;
+    if (isInterestOnly) {
+        basePayment = principal * monthlyRate; // Interest-only payment
+    } else {
+        basePayment = calculateMonthlyPayment(principal, annualRate, amortizationMonths);
+    }
+    
+    const maxMonths = Math.min(balloonTerm, amortizationMonths);
+    
+    for (let month = 1; month <= maxMonths && balance > 0; month++) {
+        const interestPayment = balance * monthlyRate;
+        let principalPayment = 0;
+        
+        if (month === balloonTerm) {
+            // Balloon payment - pay off remaining balance
+            principalPayment = balance;
+        } else if (!isInterestOnly || month > balloonTerm) {
+            // Regular principal payment (or after balloon period if interest-only)
+            principalPayment = Math.min(basePayment - interestPayment + extraPayment, balance);
+        }
+        
+        const totalPayment = interestPayment + principalPayment;
+        balance -= principalPayment;
+        
+        totalInterest += interestPayment;
+        totalPrincipal += principalPayment;
+        
+        schedule.push({
+            month,
+            date: formatDate(currentDate),
+            payment: totalPayment,
+            principal: principalPayment,
+            interest: interestPayment,
+            balance: Math.max(0, balance),
+            totalInterest,
+            totalPrincipal,
+            rate: annualRate,
+            isBalloonPayment: month === balloonTerm && principalPayment > basePayment
+        });
+        
+        currentDate.setMonth(currentDate.getMonth() + 1);
+        
+        if (balance <= 0) break;
+    }
+    
+    return schedule;
+}

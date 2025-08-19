@@ -1,0 +1,100 @@
+// Recasting Loan Calculator
+
+function createRecastingLoanFields() {
+    const fieldsContainer = document.getElementById('inputFields');
+    fieldsContainer.innerHTML = '';
+    
+    // Create synchronized input fields - same as standard loan
+    const fields = [
+        createSynchronizedInputElement('loanAmount'),
+        createSynchronizedInputElement('interestRate'),
+        createSynchronizedInputElement('loanTerm'),
+        createSynchronizedInputElement('startDate'),
+        createSynchronizedInputElement('extraPayment')
+    ];
+    
+    fields.forEach(field => {
+        if (field) {
+            fieldsContainer.appendChild(field);
+            const input = field.querySelector('input');
+            input.addEventListener('input', calculateRecastingLoan);
+        }
+    });
+    
+    // Calculate initial values
+    setTimeout(calculateRecastingLoan, 100);
+}
+
+function calculateRecastingLoan() {
+    const values = getFormValues(); // Use standard form values function
+    
+    if (!values.loanAmount || !values.interestRate || !values.loanTerm) {
+        return;
+    }
+
+    const schedule = generateRecastingAmortizationSchedule(
+        values.loanAmount,
+        values.interestRate,
+        values.loanTerm * 12,
+        values.startDate,
+        values.extraPayment
+    );
+    
+    currentSchedule = schedule;
+    updateSummary(schedule);
+    updateChart(schedule);
+    updateScheduleTable(schedule);
+}
+
+function getRecastingFormValues() {
+    return {
+        remainingBalance: getNumericValue('remainingBalance'),
+        interestRate: parseFloat(document.getElementById('interestRate')?.value || 0),
+        remainingTerm: parseInt(document.getElementById('remainingTerm')?.value || 0),
+        lumpSum: getNumericValue('lumpSum'),
+        recastFee: getNumericValue('recastFee'),
+        startDate: document.getElementById('startDate')?.value || new Date().toISOString().split('T')[0],
+        extraPayment: getNumericValue('extraPayment')
+    };
+}
+
+function generateRecastingAmortizationSchedule(principal, annualRate, months, startDate, extraPayment = 0) {
+    const schedule = [];
+    let balance = principal;
+    const monthlyRate = annualRate / 100 / 12;
+    let currentDate = new Date(startDate);
+    let totalInterest = 0;
+    let totalPrincipal = 0;
+    
+    // Calculate base monthly payment
+    const basePayment = calculateMonthlyPayment(principal, annualRate, months);
+    
+    for (let month = 1; month <= months && balance > 0; month++) {
+        const interestPayment = balance * monthlyRate;
+        let principalPayment = Math.min(basePayment - interestPayment + extraPayment, balance);
+        
+        const totalPayment = interestPayment + principalPayment;
+        balance -= principalPayment;
+        
+        totalInterest += interestPayment;
+        totalPrincipal += principalPayment;
+        
+        schedule.push({
+            month,
+            date: formatDate(currentDate),
+            payment: totalPayment,
+            principal: principalPayment,
+            interest: interestPayment,
+            balance: Math.max(0, balance),
+            totalInterest,
+            totalPrincipal,
+            rate: annualRate
+        });
+        
+        currentDate.setMonth(currentDate.getMonth() + 1);
+        
+        if (balance <= 0) break;
+    }
+    
+    return schedule;
+}
