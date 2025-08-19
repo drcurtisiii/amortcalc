@@ -69,8 +69,10 @@ function createARMLoanFields() {
             fieldsContainer.appendChild(borrowerField);
         } else {
             // Fallback: create field directly
-            const fallbackBorrower = createInputElement('caseName', 'text', 'Borrower(s)', document.getElementById('caseName')?.value || '');
-            fieldsContainer.appendChild(fallbackBorrower);
+            const fallbackBorrower = createInputElement('caseName', 'text', 'Borrower(s)', window.sharedFieldValues?.caseName || '');
+            if (fallbackBorrower) {
+                fieldsContainer.appendChild(fallbackBorrower);
+            }
         }
         
         // 2. Loan Amount  
@@ -80,9 +82,11 @@ function createARMLoanFields() {
             loanAmountField.querySelector('input').addEventListener('input', calculateARMLoan);
         } else {
             // Fallback: create field directly
-            const fallbackLoanAmount = createInputElement('loanAmount', 'number', 'Loan Amount ($)', 250000, '', 0, null, 1);
-            fieldsContainer.appendChild(fallbackLoanAmount);
-            document.getElementById('loanAmount').addEventListener('input', calculateARMLoan);
+            const fallbackLoanAmount = createInputElement('loanAmount', 'number', 'Loan Amount ($)', window.sharedFieldValues?.loanAmount || 250000, '', 0, null, 1);
+            if (fallbackLoanAmount) {
+                fieldsContainer.appendChild(fallbackLoanAmount);
+                document.getElementById('loanAmount').addEventListener('input', calculateARMLoan);
+            }
         }
         
         // 3. Loan Term
@@ -92,9 +96,11 @@ function createARMLoanFields() {
             loanTermField.querySelector('input').addEventListener('input', calculateARMLoan);
         } else {
             // Fallback: create field directly
-            const fallbackLoanTerm = createInputElement('loanTerm', 'number', 'Loan Term (years)', 30, '', 1, 50, 1);
-            fieldsContainer.appendChild(fallbackLoanTerm);
-            document.getElementById('loanTerm').addEventListener('input', calculateARMLoan);
+            const fallbackLoanTerm = createInputElement('loanTerm', 'number', 'Loan Term (years)', window.sharedFieldValues?.loanTerm || 30, '', 1, 50, 1);
+            if (fallbackLoanTerm) {
+                fieldsContainer.appendChild(fallbackLoanTerm);
+                document.getElementById('loanTerm').addEventListener('input', calculateARMLoan);
+            }
         }
         
         // 4. ARM Index (dropdown with external links)
@@ -161,9 +167,11 @@ function createARMLoanFields() {
             extraPaymentField.querySelector('input').addEventListener('input', calculateARMLoan);
         } else {
             // Fallback: create field directly
-            const fallbackExtraPayment = createInputElement('extraPayment', 'number', 'Extra Monthly Payment ($)', 0, '', 0, null, 1);
-            fieldsContainer.appendChild(fallbackExtraPayment);
-            document.getElementById('extraPayment').addEventListener('input', calculateARMLoan);
+            const fallbackExtraPayment = createInputElement('extraPayment', 'number', 'Extra Monthly Payment ($)', window.sharedFieldValues?.extraPayment || 0, '', 0, null, 1);
+            if (fallbackExtraPayment) {
+                fieldsContainer.appendChild(fallbackExtraPayment);
+                document.getElementById('extraPayment').addEventListener('input', calculateARMLoan);
+            }
         }
         
         // Create custom index input field (initially hidden)
@@ -182,32 +190,6 @@ function createARMLoanFields() {
     } catch (error) {
         console.error('Error creating ARM loan fields:', error);
     }
-}
-    const adjustmentOptions = [
-        { value: 6, text: '6 Months' },
-        { value: 12, text: '1 Year' }
-    ];
-    const adjustmentField = createSelectElement('adjustmentPeriod', 'Adjustment Period', adjustmentOptions, 12);
-    fieldsContainer.appendChild(adjustmentField);
-    document.getElementById('adjustmentPeriod').addEventListener('change', calculateARMLoan);
-    
-    // 11. Extra Monthly Payment
-    const extraPaymentField = createSynchronizedInputElement('extraPayment');
-    fieldsContainer.appendChild(extraPaymentField);
-    extraPaymentField.querySelector('input').addEventListener('input', calculateARMLoan);
-    
-    // Create custom index input field (initially hidden)
-    const customIndexField = createInputElement('customIndex', 'text', 'Custom Index Name', '', 'e.g., Bank Prime Rate, Custom Rate, etc.');
-    customIndexField.style.display = 'none';
-    customIndexField.id = 'customIndexField';
-    fieldsContainer.appendChild(customIndexField);
-    document.getElementById('customIndex').addEventListener('input', calculateARMLoan);
-    
-    // Initialize calculations
-    setTimeout(() => {
-        updateFullyIndexedRate();
-        calculateARMLoan();
-    }, 100);
 }
 
 // Simplified rate initialization function
