@@ -88,10 +88,12 @@ async function createPDFDocument() {
 
 // Add summary table to PDF
 function addSummaryTable(doc, summary, margin, contentWidth, yPos) {
-    // Table title
+    // Table title - include loan type
     doc.setFontSize(16);
     doc.setFont(undefined, 'bold');
-    const tableTitle = 'Loan Summary';
+    const loanTypeDisplayName = currentLoanType.charAt(0).toUpperCase() + currentLoanType.slice(1);
+    const adjustedLoanType = currentLoanType === 'arm' ? 'Adjustable Rate' : loanTypeDisplayName;
+    const tableTitle = `Loan Summary (${adjustedLoanType})`;
     const tableTitleWidth = doc.getTextWidth(tableTitle);
     doc.text(tableTitle, (doc.internal.pageSize.getWidth() - tableTitleWidth) / 2, yPos);
     yPos += 8; // Reduced spacing between title and table
@@ -165,9 +167,25 @@ function addSummaryTable(doc, summary, margin, contentWidth, yPos) {
             adjustmentPeriod = months === '6' ? '6 Months' : '1 Year';
         }
         
+        // Get index rate and margin for detailed ARM info
+        const indexRateElement = document.getElementById('indexRate');
+        const marginElement = document.getElementById('margin');
+        
+        let indexRateText = 'Not Specified';
+        if (indexRateElement && indexRateElement.value) {
+            indexRateText = indexRateElement.value + '%';
+        }
+        
+        let marginText = 'Not Specified';
+        if (marginElement && marginElement.value) {
+            marginText = marginElement.value + '%';
+        }
+        
         // Insert ARM-specific fields after loan type
         tableData.splice(4, 0, 
             ['ARM Index:', armIndexText],
+            ['Index Rate:', indexRateText],
+            ['Margin Rate:', marginText],
             ['Fully Indexed Rate:', fullyIndexedRate],
             ['Fixed Rate Period:', fixedPeriod],
             ['Adjustment Period:', adjustmentPeriod]
@@ -387,7 +405,7 @@ function addBalloonWarning(doc, margin, contentWidth, yPos) {
         year: 'numeric', 
         month: 'long', 
         day: 'numeric' 
-    });
+    }).toUpperCase();
     
     // Warning box dimensions - calculate height dynamically
     const textMargin = margin + 5;
@@ -441,7 +459,7 @@ function addBalloonWarning(doc, margin, contentWidth, yPos) {
 function addARMWarning(doc, margin, contentWidth, yPos) {
     // Get current loan values for calculations - use ARM field names
     const loanAmountElement = document.getElementById('loanAmount');
-    const interestRateElement = document.getElementById('interestRate');
+    const fullyIndexedRateElement = document.getElementById('fullyIndexedRate');
     const loanTermElement = document.getElementById('loanTerm');
     const marginElement = document.getElementById('margin');
     const lifetimeCapElement = document.getElementById('lifetimeCap');
@@ -451,7 +469,7 @@ function addARMWarning(doc, margin, contentWidth, yPos) {
     
     // Get raw values and ensure they're proper numbers
     const initialBalance = loanAmountElement ? parseFloat(loanAmountElement.value.replace(/[,$]/g, '')) || 0 : 0;
-    const initialRate = interestRateElement ? parseFloat(interestRateElement.value) || 0 : 0;
+    const initialRate = fullyIndexedRateElement ? parseFloat(fullyIndexedRateElement.value) || 0 : 0;
     const loanTerm = loanTermElement ? parseFloat(loanTermElement.value) || 0 : 0;
     const armMargin = marginElement ? parseFloat(marginElement.value) || 0 : 0;
     const lifetimeCap = lifetimeCapElement ? parseFloat(lifetimeCapElement.value) || 0 : 0;
