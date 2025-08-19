@@ -4,7 +4,7 @@
   "description": "Professional loan amortization calculator with live Federal Reserve data integration",
   "main": "index.html",
   "scripts": {
-    "build": "echo 'No build step required for static site'",
+    "build": "node -e \"const fs = require('fs'); const path = require('path'); if (!fs.existsSync('dist')) fs.mkdirSync('dist'); const files = fs.readdirSync('.').filter(f => !f.startsWith('.') && f !== 'dist' && f !== 'node_modules' && f !== 'copilotworkspace'); files.forEach(f => { const stat = fs.statSync(f); if (stat.isFile()) { fs.copyFileSync(f, path.join('dist', f)); } else if (stat.isDirectory()) { fs.cpSync(f, path.join('dist', f), {recursive: true}); } }); console.log('Static site copied to dist folder');\"",
     "start": "npx serve .",
     "dev": "npx live-server ."
   },
