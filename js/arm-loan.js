@@ -63,7 +63,7 @@ function createARMLoanFields() {
     `;
     
     // 1. Borrower
-    const borrowerField = createSynchronizedInputElement('borrower');
+    const borrowerField = createSynchronizedInputElement('caseName');
     fieldsContainer.appendChild(borrowerField);
     
     // 2. Loan Amount  

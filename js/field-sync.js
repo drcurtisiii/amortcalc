@@ -3,6 +3,7 @@
 
 // Global storage for shared field values
 window.sharedFieldValues = {
+    caseName: '',
     loanAmount: 250000,
     interestRate: 6.5,
     loanTerm: 30,
@@ -13,6 +14,7 @@ window.sharedFieldValues = {
 
 // Common field definitions that are shared across loan types
 const SHARED_FIELDS = {
+    caseName: { id: 'caseName', type: 'text', label: 'Borrower(s)' },
     loanAmount: { id: 'loanAmount', type: 'number', label: 'Loan Amount ($)', min: 0, max: null, step: 1 },
     interestRate: { id: 'interestRate', type: 'number', label: 'Interest Rate (%)', min: 0, max: 50, step: 0.125 },
     loanTerm: { id: 'loanTerm', type: 'number', label: 'Loan Term (years)', min: 1, max: 50, step: 1 },
