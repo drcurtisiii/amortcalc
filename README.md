@@ -126,11 +126,26 @@ For technical support or feature requests, contact:
 The application is automatically deployed to GitHub Pages from the `main` branch.
 
 ### Netlify Integration
-For enhanced deployment features:
+The repository includes Netlify configuration for enhanced deployment:
+
+**Automatic Setup:**
 1. Connect GitHub repository to Netlify
-2. Set build command: (none - static site)
-3. Set publish directory: `/`
-4. Enable automatic deploys from `main` branch
+2. Netlify will automatically detect the `netlify.toml` configuration
+3. **Build Command**: Automatically set to `echo 'Static site - no build required'`
+4. **Publish Directory**: Automatically set to `.` (root)
+5. Enable automatic deploys from `main` branch
+
+**Manual Setup (if needed):**
+- Build Command: Leave blank or use `echo 'No build required'`
+- Publish Directory: `.` (root directory)
+- Node Version: 18 (optional)
+
+**Features Included:**
+- ✅ Static site configuration (no build process needed)
+- ✅ Security headers for production
+- ✅ FRED API CORS configuration
+- ✅ Asset caching optimization
+- ✅ SPA routing support
 
 ---
 
