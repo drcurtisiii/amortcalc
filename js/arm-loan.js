@@ -497,8 +497,7 @@ function calculateARMLoan() {
         values.interestRate,
         values.loanTerm * 12,
         values.startDate,
-        values.extraPayment,
-        armSettings
+        values.extraPayment
     );
     
     currentSchedule = schedule;
@@ -534,27 +533,24 @@ function getARMFormValues() {
     };
 }
 
-function generateARMAmortizationSchedule(principal, initialRate, months, startDate, extraPayment = 0, armSettings) {
+function generateARMAmortizationSchedule(principal, initialRate, months, startDate, extraPayment = 0) {
     const schedule = [];
     let balance = principal;
     let currentDate = new Date(startDate);
     let totalInterest = 0;
     let totalPrincipal = 0;
     
-    // For ARM loans, use the fully indexed rate consistently throughout
-    // We cannot predict future rate changes, so use the current fully indexed rate for all calculations
-    // This provides a realistic payment schedule based on current market conditions
+    // For ARM loans, treat as fixed rate using the fully indexed rate (index + margin)
+    // Use the same calculation as standard loans - no rate speculation or adjustments
     const fullyIndexedRate = initialRate; // This is already the fully indexed rate from the form
+    const monthlyRate = fullyIndexedRate / 100 / 12;
+    
+    // Calculate fixed monthly payment for the entire loan term (same as standard loan)
+    const basePayment = calculateMonthlyPayment(principal, fullyIndexedRate, months);
     
     for (let month = 1; month <= months && balance > 0; month++) {
-        const monthlyRate = fullyIndexedRate / 100 / 12;
         const interestPayment = balance * monthlyRate;
-        
-        // Calculate payment needed to amortize remaining balance over remaining term
-        const remainingMonths = months - month + 1;
-        const scheduledPayment = calculateMonthlyPayment(balance, fullyIndexedRate, remainingMonths);
-        
-        let principalPayment = Math.min(scheduledPayment - interestPayment + extraPayment, balance);
+        let principalPayment = Math.min(basePayment - interestPayment + extraPayment, balance);
         
         const totalPayment = interestPayment + principalPayment;
         balance -= principalPayment;
