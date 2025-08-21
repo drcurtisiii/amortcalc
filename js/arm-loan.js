@@ -540,19 +540,21 @@ function generateARMAmortizationSchedule(principal, initialRate, months, startDa
     let currentDate = new Date(startDate);
     let totalInterest = 0;
     let totalPrincipal = 0;
-    let currentRate = initialRate;
     
-    // Calculate base monthly payment using initial rate
-    let basePayment = calculateMonthlyPayment(principal, initialRate, months);
+    // For ARM loans, use the fully indexed rate consistently throughout
+    // We cannot predict future rate changes, so use the current fully indexed rate for all calculations
+    // This provides a realistic payment schedule based on current market conditions
+    const fullyIndexedRate = initialRate; // This is already the fully indexed rate from the form
     
     for (let month = 1; month <= months && balance > 0; month++) {
-        // For ARM loans, maintain the fully indexed rate throughout
-        // We cannot predict future rate changes, so use the current fully indexed rate for all calculations
-        // This provides a realistic payment schedule based on current market conditions
-        
-        const monthlyRate = currentRate / 100 / 12;
+        const monthlyRate = fullyIndexedRate / 100 / 12;
         const interestPayment = balance * monthlyRate;
-        let principalPayment = Math.min(basePayment - interestPayment + extraPayment, balance);
+        
+        // Calculate payment needed to amortize remaining balance over remaining term
+        const remainingMonths = months - month + 1;
+        const scheduledPayment = calculateMonthlyPayment(balance, fullyIndexedRate, remainingMonths);
+        
+        let principalPayment = Math.min(scheduledPayment - interestPayment + extraPayment, balance);
         
         const totalPayment = interestPayment + principalPayment;
         balance -= principalPayment;
@@ -569,7 +571,7 @@ function generateARMAmortizationSchedule(principal, initialRate, months, startDa
             balance: Math.max(0, balance),
             totalInterest,
             totalPrincipal,
-            rate: currentRate
+            rate: fullyIndexedRate
         });
         
         currentDate.setMonth(currentDate.getMonth() + 1);
