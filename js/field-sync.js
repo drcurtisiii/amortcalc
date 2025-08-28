@@ -1,0 +1,256 @@
+// Field Synchronization System
+// Manages synchronization of common fields across all loan types
+
+// Global storage for shared field values
+window.sharedFieldValues = {
+    caseName: '',
+    loanAmount: 250000,
+    interestRate: 6.5,
+    armFullyIndexedRate: 0, // Separate field for ARM Fully Indexed Rate
+    loanTerm: 30,
+    loanTermYears: 30,
+    loanTermMonths: 0,
+    amortizationPeriod: 30, // Used by balloon loans
+    balloonTerm: 5,
+    balloonTermYears: 5,
+    balloonTermMonths: 0,
+    extraPayment: 0,
+    startDate: new Date().toISOString().split('T')[0],
+    firstPaymentDate: (() => {
+        const today = new Date();
+        const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+        return nextMonth.toISOString().split('T')[0];
+    })(),
+    paymentDueDay: 'first'
+};
+
+// Common field definitions that are shared across loan types
+const SHARED_FIELDS = {
+    caseName: { id: 'caseName', type: 'text', label: 'Borrower(s)' },
+    loanAmount: { id: 'loanAmount', type: 'number', label: 'Loan Amount ($)', min: 0, max: null, step: 1 },
+    interestRate: { id: 'interestRate', type: 'number', label: 'Interest Rate (%)', min: 0, max: 50, step: 0.125 },
+    armFullyIndexedRate: { id: 'armFullyIndexedRate', type: 'number', label: 'Fully Indexed Rate (%)', min: 0, max: 50, step: 0.01 },
+    loanTerm: { id: 'loanTerm', type: 'dual-number', label: 'Loan Term (Years & Months)', parts: [
+        { id: 'loanTermYears', label: 'Years', min: 0, max: 50, step: 1, defaultValue: 30 },
+        { id: 'loanTermMonths', label: 'Months', min: 0, max: 11, step: 1, defaultValue: 0 }
+    ]},
+    amortizationPeriod: { id: 'amortizationPeriod', type: 'number', label: 'Amortization Period (years)', min: 1, max: 50, step: 1 },
+    balloonTerm: { id: 'balloonTerm', type: 'dual-number', label: 'Balloon Term (Years & Months)', parts: [
+        { id: 'balloonTermYears', label: 'Years', min: 0, max: 50, step: 1, defaultValue: 5 },
+        { id: 'balloonTermMonths', label: 'Months', min: 0, max: 11, step: 1, defaultValue: 0 }
+    ]},
+    extraPayment: { id: 'extraPayment', type: 'number', label: 'Extra Monthly Payment ($)', min: 0, max: null, step: 1 },
+    startDate: { id: 'startDate', type: 'date', label: 'Start Date' },
+    firstPaymentDate: { id: 'firstPaymentDate', type: 'date', label: 'First Payment Due Date' },
+    paymentDueDay: { id: 'paymentDueDay', type: 'select', label: 'Payment Due Day', options: [
+        { value: 'first', text: '1st of each month' },
+        { value: 'fifth', text: '5th of each month' },
+        { value: 'tenth', text: '10th of each month' },
+        { value: 'fifteenth', text: '15th of each month' },
+        { value: 'same', text: 'Same as first payment date' }
+    ]}
+};
+
+// Function to create the common fields container
+function createCommonFieldsContainer(loanType = 'standard') {
+    const container = document.getElementById('commonFieldsContainer');
+    container.innerHTML = '';
+    
+    // Define common fields based on loan type
+    const commonFields = [
+        { key: 'caseName', position: 'field-borrower' },
+        { key: 'loanAmount', position: 'field-loan-amount' },
+        { 
+            key: 'loanTerm', 
+            position: 'field-loan-term', 
+            customLabel: loanType === 'desired-payment' ? 'Loan Term' : 
+                        loanType === 'balloon' ? 'Amortization Period' : 'Loan Term',
+            readOnly: loanType === 'desired-payment'
+        },
+        { 
+            key: loanType === 'arm' ? 'armFullyIndexedRate' : 'interestRate', 
+            position: 'field-interest-rate', 
+            customLabel: loanType === 'arm' ? 'Fully Indexed Rate (%)' : null,
+            readOnly: loanType === 'arm'
+        },
+        { key: 'startDate', position: 'field-start-date' },
+        { key: 'firstPaymentDate', position: 'field-first-payment-date' },
+        { key: 'paymentDueDay', position: 'field-payment-due-day' }
+    ];
+    
+    commonFields.forEach(({ key, position, customLabel, skip, readOnly }) => {
+        if (skip) return; // Skip this field for this loan type
+        
+        let fieldElement;
+        
+        // Special handling for ARM Fully Indexed Rate field
+        if (key === 'armFullyIndexedRate' && loanType === 'arm') {
+            fieldElement = createInputElement('fullyIndexedRate', 'number', customLabel || 'Fully Indexed Rate (%)', '', 'Automatically calculated: Index Rate + Margin', 0, 50, 0.01);
+        } else {
+            fieldElement = createSynchronizedInputElement(key, null, customLabel);
+        }
+        
+        if (fieldElement) {
+            fieldElement.classList.add(position);
+            
+            // Make field read-only if specified
+            if (readOnly) {
+                const inputs = fieldElement.querySelectorAll('input');
+                inputs.forEach(input => {
+                    input.readOnly = true;
+                    input.style.backgroundColor = '#f1f5f9';
+                    input.style.fontWeight = 'bold';
+                    input.style.cursor = 'not-allowed';
+                });
+            }
+            
+            container.appendChild(fieldElement);
+        }
+    });
+}
+
+// Function to add event listeners to common fields
+function addCommonFieldEventListeners(calculationFunction) {
+    const commonContainer = document.getElementById('commonFieldsContainer');
+    const inputElements = commonContainer.querySelectorAll('input, select');
+    
+    inputElements.forEach(inputElement => {
+        const eventType = inputElement.tagName.toLowerCase() === 'select' ? 'change' : 'input';
+        inputElement.addEventListener(eventType, calculationFunction);
+    });
+}
+
+// Function to create a synchronized input element
+function createSynchronizedInputElement(fieldKey, defaultValue = null, customLabel = null) {
+    const fieldDef = SHARED_FIELDS[fieldKey];
+    if (!fieldDef) {
+        console.error(`Unknown shared field: ${fieldKey}`);
+        return null;
+    }
+    
+    const label = customLabel || fieldDef.label;
+    const value = defaultValue !== null ? defaultValue : window.sharedFieldValues[fieldKey];
+    
+    let element;
+    if (fieldDef.type === 'select') {
+        element = createSelectElement(fieldDef.id, label, fieldDef.options, value);
+    } else if (fieldDef.type === 'dual-number') {
+        element = createDualNumberInputElement(fieldDef, label);
+    } else {
+        element = createInputElement(
+            fieldDef.id,
+            fieldDef.type,
+            label,
+            value,
+            '',
+            fieldDef.min,
+            fieldDef.max,
+            fieldDef.step
+        );
+    }
+    
+    // Add synchronization listener
+    if (fieldDef.type === 'dual-number') {
+        // For dual-number fields, listeners are already added in createDualNumberInputElement
+    } else {
+        const inputElement = element.querySelector('input') || element.querySelector('select');
+        if (inputElement) {
+            const eventType = inputElement.tagName.toLowerCase() === 'select' ? 'change' : 'input';
+            inputElement.addEventListener(eventType, function() {
+                synchronizeField(fieldKey, this.value);
+            });
+        }
+    }
+    
+    return element;
+}
+
+// Function to calculate first payment date based on start date
+function calculateFirstPaymentDate(startDate) {
+    if (!startDate) {
+        return new Date().toISOString().split('T')[0];
+    }
+    const start = new Date(startDate);
+    if (isNaN(start.getTime())) {
+        return new Date().toISOString().split('T')[0];
+    }
+    const firstPayment = new Date(start.getFullYear(), start.getMonth() + 1, 1);
+    return firstPayment.toISOString().split('T')[0];
+}
+
+// Function to synchronize a field value across all loan types
+function synchronizeField(fieldKey, newValue) {
+    // Update the shared storage
+    if (fieldKey === 'loanTerm' && window.sharedFieldValues.hasOwnProperty('amortizationPeriod')) {
+        // Keep loanTerm and amortizationPeriod in sync
+        window.sharedFieldValues.loanTerm = newValue;
+        window.sharedFieldValues.amortizationPeriod = newValue;
+    } else if (fieldKey === 'amortizationPeriod' && window.sharedFieldValues.hasOwnProperty('loanTerm')) {
+        // Keep amortizationPeriod and loanTerm in sync
+        window.sharedFieldValues.amortizationPeriod = newValue;
+        window.sharedFieldValues.loanTerm = newValue;
+    } else if (fieldKey === 'startDate') {
+        // When start date changes, auto-update first payment date
+        window.sharedFieldValues.startDate = newValue;
+        const newFirstPaymentDate = calculateFirstPaymentDate(newValue);
+        window.sharedFieldValues.firstPaymentDate = newFirstPaymentDate;
+        
+        // Update first payment date field if it exists
+        const firstPaymentElements = document.querySelectorAll('input[id="firstPaymentDate"]');
+        firstPaymentElements.forEach(element => {
+            if (element.value !== newFirstPaymentDate) {
+                element.value = newFirstPaymentDate;
+                // Trigger input event to update calculations
+                element.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        });
+    } else {
+        window.sharedFieldValues[fieldKey] = newValue;
+    }
+    
+    // Update all visible fields with the same ID
+    const targetIds = [fieldKey];
+    if (fieldKey === 'loanTerm') {
+        targetIds.push('amortizationPeriod');
+    } else if (fieldKey === 'amortizationPeriod') {
+        targetIds.push('loanTerm');
+    }
+    
+    targetIds.forEach(targetId => {
+        const elements = document.querySelectorAll(`input[id="${targetId}"]`);
+        elements.forEach(element => {
+            if (element.value !== newValue) {
+                element.value = newValue;
+                // Trigger input event to update calculations
+                element.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        });
+    });
+}
+
+// Function to get current shared field values
+function getSharedFieldValues() {
+    return { ...window.sharedFieldValues };
+}
+
+// Function to update shared values from borrower fields (which persist across tab changes)
+function syncFromBorrowerFields() {
+    const borrowers = document.getElementById('borrowers');
+    if (borrowers && borrowers.value) {
+        // Borrowers field is handled separately and doesn't need sync
+    }
+}
+
+// Initialize field synchronization when the page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Set up borrower field to persist across tab changes
+    const borrowerContainer = document.querySelector('.borrower-input');
+    if (borrowerContainer) {
+        const borrowerInput = borrowerContainer.querySelector('input');
+        if (borrowerInput) {
+            borrowerInput.addEventListener('input', function() {
+                window.borrowerValue = this.value;
+            });
+        }
+    }
+});

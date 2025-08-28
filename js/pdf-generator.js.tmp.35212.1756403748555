@@ -1,0 +1,1463 @@
+// PDF Generation - Generate PDF and open in new tab
+
+async function generatePDF() {
+    try {
+        let pdfBlob;
+        
+        // Call the appropriate PDF generation function based on loan type
+        if (currentLoanType === 'payoff-calculator') {
+            pdfBlob = await createPayoffCalculatorPDFDocument();
+        } else {
+            pdfBlob = await createPDFDocument();
+        }
+        
+        if (pdfBlob) {
+            const pdfUrl = URL.createObjectURL(pdfBlob);
+            window.open(pdfUrl, '_blank');
+        }
+    } catch (error) {
+        console.error('Error generating PDF:', error);
+        alert('Error generating PDF. Please try again.');
+    }
+}
+
+// Capture chart as image for PDF
+function captureChartAsImage() {
+    return new Promise((resolve) => {
+        if (currentChart && currentChart.canvas) {
+            try {
+                const canvas = currentChart.canvas;
+                const imageData = canvas.toDataURL('image/png', 0.8);
+                resolve(imageData);
+            } catch (error) {
+                console.error('Error capturing chart:', error);
+                resolve(null);
+            }
+        } else {
+            resolve(null);
+        }
+    });
+}
+
+// Create PDF document from scratch
+async function createPDFDocument() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // Page dimensions - 0.5" margins
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 18; // 0.25 inches (0.25 * 72 = 18 points) - 50% of previous margin
+    const contentWidth = pageWidth - (margin * 2);
+    
+    // Get data
+    const caseName = document.getElementById('caseName').value;
+    const borrowerName = caseName; // Use caseName as borrower name for footer
+    const summary = getSummaryData();
+    const chartImage = await captureChartAsImage();
+    
+    // PAGE 1: Summary Page
+    let yPos = margin + 15; // Reduced initial spacing
+    
+    // Title: "Amortization Calculator" (centered)
+    doc.setFontSize(20);
+    doc.setFont(undefined, 'bold');
+    const title = 'Amortization Calculator';
+    const titleWidth = doc.getTextWidth(title);
+    doc.text(title, (pageWidth - titleWidth) / 2, yPos);
+    yPos += 10; // Reduced spacing between title and case name
+
+    // Case name (centered, if provided)
+    if (caseName) {
+        doc.setFontSize(16);
+        doc.setFont(undefined, 'normal');
+        const caseWidth = doc.getTextWidth(caseName);
+        doc.text(caseName, (pageWidth - caseWidth) / 2, yPos);
+        yPos += 10; // Reduced spacing after case name
+    }
+    
+    // Common Fields Table
+    yPos = addCommonFieldsTable(doc, summary, margin, contentWidth, yPos);
+    
+    // Tab-Specific Fields Table  
+    yPos = addTabSpecificFieldsTable(doc, summary, margin, contentWidth, yPos);
+    
+    // Loan Summary Table
+    yPos = addLoanSummaryTable(doc, summary, margin, contentWidth, yPos);
+    
+    // Chart image
+    if (chartImage) {
+        yPos = addChartImage(doc, chartImage, margin, contentWidth, yPos, borrowerName);
+    }
+    
+    // Add footer to page 1
+    addFooter(doc, 1, pageWidth, pageHeight, margin, null, borrowerName);
+    
+    // PAGE 2+: Amortization Schedule
+    doc.addPage();
+    addAmortizationSchedule(doc, margin, contentWidth, pageWidth, pageHeight, borrowerName);
+    
+    return doc.output('blob');
+}
+
+// Add common fields table (4-column layout mirroring webapp)
+function addCommonFieldsTable(doc, summary, margin, contentWidth, yPos) {
+    // Get common field values
+    const borrowerName = document.getElementById('caseName')?.value || 'Not Specified';
+    const loanAmount = document.getElementById('loanAmount')?.value || 'Not Specified';
+    const loanTermYears = document.getElementById('loanTermYears')?.value || '0';
+    const loanTermMonths = document.getElementById('loanTermMonths')?.value || '0';
+    const startDate = document.getElementById('startDate')?.value || 'Not Specified';
+    const firstPaymentDate = document.getElementById('firstPaymentDate')?.value || 'Not Specified';
+    const paymentDueDay = document.getElementById('paymentDueDay')?.value || 'first';
+    
+    // Format loan term
+    const years = parseInt(loanTermYears);
+    const months = parseInt(loanTermMonths);
+    let loanTermText = 'Not Specified';
+    if (years > 0 || months > 0) {
+        if (years > 0 && months > 0) {
+            loanTermText = `${years} Years, ${months} Months`;
+        } else if (years > 0) {
+            loanTermText = `${years} Year${years > 1 ? 's' : ''}`;
+        } else {
+            loanTermText = `${months} Month${months > 1 ? 's' : ''}`;
+        }
+    }
+    
+    // Get appropriate labels based on loan type
+    let termLabel = 'Loan Term';
+    let rateLabel = 'Interest Rate (%)';
+    let rateValue = document.getElementById('interestRate')?.value || 'Not Specified';
+    
+    if (currentLoanType === 'balloon') {
+        termLabel = 'Amortization Period';
+    } else if (currentLoanType === 'arm') {
+        rateLabel = 'Fully Indexed Rate (%)';
+        rateValue = document.getElementById('fullyIndexedRate')?.value || 'Not Specified';
+    } else if (currentLoanType === 'desired-payment') {
+        termLabel = 'Loan Term';
+    }
+    
+    // Format payment due day
+    const paymentDueDayText = {
+        'first': '1st of each month',
+        'fifth': '5th of each month',
+        'tenth': '10th of each month',
+        'fifteenth': '15th of each month',
+        'same': 'Same as first payment date'
+    }[paymentDueDay] || '1st of each month';
+    
+    // Table dimensions - 4 columns, 2 rows
+    const tableWidth = contentWidth;
+    const tableX = margin;
+    const colWidth = tableWidth / 4;
+    const rowHeight = 12; // Taller for header + value
+    
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.5);
+    
+    // Row 1: Headers and values
+    const row1Y = yPos;
+    
+    // A1: Borrower(s) - merged A1:B1
+    doc.rect(tableX, row1Y, colWidth * 2, rowHeight);
+    doc.setFontSize(8);
+    doc.setFont(undefined, 'bold');
+    doc.text('Borrower(s)', tableX + 5, row1Y + 4);
+    doc.setFont(undefined, 'normal');
+    doc.text(borrowerName, tableX + 5, row1Y + 9);
+    
+    // C1: Loan Term
+    doc.rect(tableX + colWidth * 2, row1Y, colWidth, rowHeight);
+    doc.setFont(undefined, 'bold');
+    doc.text(termLabel, tableX + colWidth * 2 + 5, row1Y + 4);
+    doc.setFont(undefined, 'normal');
+    doc.text(loanTermText, tableX + colWidth * 2 + 5, row1Y + 9);
+    
+    // D1: Interest Rate
+    doc.rect(tableX + colWidth * 3, row1Y, colWidth, rowHeight);
+    doc.setFont(undefined, 'bold');
+    doc.text(rateLabel, tableX + colWidth * 3 + 5, row1Y + 4);
+    doc.setFont(undefined, 'normal');
+    doc.text(rateValue + (rateValue !== 'Not Specified' ? '%' : ''), tableX + colWidth * 3 + 5, row1Y + 9);
+    
+    // Row 2
+    const row2Y = row1Y + rowHeight;
+    
+    // A2: Start Date
+    doc.rect(tableX, row2Y, colWidth, rowHeight);
+    doc.setFont(undefined, 'bold');
+    doc.text('Start Date', tableX + 5, row2Y + 4);
+    doc.setFont(undefined, 'normal');
+    doc.text(startDate, tableX + 5, row2Y + 9);
+    
+    // B2: First Payment Date
+    doc.rect(tableX + colWidth, row2Y, colWidth, rowHeight);
+    doc.setFont(undefined, 'bold');
+    doc.text('First Payment Date', tableX + colWidth + 5, row2Y + 4);
+    doc.setFont(undefined, 'normal');
+    doc.text(firstPaymentDate, tableX + colWidth + 5, row2Y + 9);
+    
+    // C2: Payment Due Day
+    doc.rect(tableX + colWidth * 2, row2Y, colWidth, rowHeight);
+    doc.setFont(undefined, 'bold');
+    doc.text('Payment Due Day', tableX + colWidth * 2 + 5, row2Y + 4);
+    doc.setFont(undefined, 'normal');
+    doc.text(paymentDueDayText, tableX + colWidth * 2 + 5, row2Y + 9);
+    
+    // D2: Loan Amount
+    doc.rect(tableX + colWidth * 3, row2Y, colWidth, rowHeight);
+    doc.setFont(undefined, 'bold');
+    doc.text('Loan Amount ($)', tableX + colWidth * 3 + 5, row2Y + 4);
+    doc.setFont(undefined, 'normal');
+    const loanAmountFormatted = loanAmount !== 'Not Specified' ? formatCurrency(parseFloat(loanAmount.replace(/,/g, '')) || 0) : 'Not Specified';
+    doc.text(loanAmountFormatted, tableX + colWidth * 3 + 5, row2Y + 9);
+    
+    return row2Y + rowHeight + 8;
+}
+
+// Add tab-specific fields table (4-column layout)
+function addTabSpecificFieldsTable(doc, summary, margin, contentWidth, yPos) {
+    let tabFields = [];
+    
+    // Get tab-specific fields based on loan type
+    if (currentLoanType === 'arm') {
+        const armIndex = document.getElementById('armIndex')?.value || 'Not Specified';
+        const indexRate = document.getElementById('indexRate')?.value || 'Not Specified';
+        const margin = document.getElementById('margin')?.value || 'Not Specified';
+        const fixedPeriod = document.getElementById('fixedPeriod')?.value || 'Not Specified';
+        const adjustmentPeriod = document.getElementById('adjustmentPeriod')?.value || 'Not Specified';
+        
+        tabFields = [
+            { label: 'ARM Index', value: armIndex },
+            { label: 'Index Rate (%)', value: indexRate !== 'Not Specified' ? indexRate + '%' : 'Not Specified' },
+            { label: 'Margin (%)', value: margin !== 'Not Specified' ? margin + '%' : 'Not Specified' },
+            { label: 'Fixed Period', value: fixedPeriod !== 'Not Specified' ? fixedPeriod + ' Years' : 'Not Specified' },
+            { label: 'Adjustment Period', value: adjustmentPeriod === '6' ? '6 Months' : adjustmentPeriod === '12' ? '1 Year' : 'Not Specified' }
+        ];
+    } else if (currentLoanType === 'balloon') {
+        const balloonTermYears = document.getElementById('balloonTermYears')?.value || '0';
+        const balloonTermMonths = document.getElementById('balloonTermMonths')?.value || '0';
+        const isInterestOnly = document.getElementById('isInterestOnly')?.value || 'false';
+        const extraPayment = document.getElementById('extraPayment')?.value || '0';
+        
+        const years = parseInt(balloonTermYears);
+        const months = parseInt(balloonTermMonths);
+        let balloonTermText = 'Not Specified';
+        if (years > 0 || months > 0) {
+            if (years > 0 && months > 0) {
+                balloonTermText = `${years} Years, ${months} Months`;
+            } else if (years > 0) {
+                balloonTermText = `${years} Year${years > 1 ? 's' : ''}`;
+            } else {
+                balloonTermText = `${months} Month${months > 1 ? 's' : ''}`;
+            }
+        }
+        
+        tabFields = [
+            { label: 'Balloon Term', value: balloonTermText },
+            { label: 'Interest Only Payments', value: isInterestOnly === 'true' ? 'Yes' : 'No' },
+            { label: 'Extra Monthly Payment', value: formatCurrency(parseFloat(extraPayment) || 0) }
+        ];
+    } else if (currentLoanType === 'desired-payment') {
+        const desiredPayment = document.getElementById('desiredPayment')?.value || '0';
+        const extraPayment = document.getElementById('extraPayment')?.value || '0';
+        
+        tabFields = [
+            { label: 'Desired Monthly Payment', value: formatCurrency(parseFloat(desiredPayment) || 0) },
+            { label: 'Extra Monthly Payment', value: formatCurrency(parseFloat(extraPayment) || 0) }
+        ];
+    } else if (currentLoanType === 'recasting') {
+        const recastingAmount = document.getElementById('recastingAmount')?.value || '0';
+        const recastingDate = document.getElementById('recastingDate')?.value || 'Not Specified';
+        const extraPayment = document.getElementById('extraPayment')?.value || '0';
+        
+        tabFields = [
+            { label: 'Recasting Amount', value: formatCurrency(parseFloat(recastingAmount) || 0) },
+            { label: 'Recasting Date', value: recastingDate },
+            { label: 'Extra Monthly Payment', value: formatCurrency(parseFloat(extraPayment) || 0) }
+        ];
+    } else if (currentLoanType === 'payoff-calculator') {
+        const presentBalance = document.getElementById('presentBalance')?.value || '0';
+        const payoffDate = document.getElementById('payoffDate')?.value || 'Not Specified';
+        
+        tabFields = [
+            { label: 'Present Balance', value: formatCurrency(parseFloat(presentBalance) || 0) },
+            { label: 'Payoff Date', value: payoffDate }
+        ];
+    } else {
+        // Standard loan - just extra payment
+        const extraPayment = document.getElementById('extraPayment')?.value || '0';
+        tabFields = [
+            { label: 'Extra Monthly Payment', value: formatCurrency(parseFloat(extraPayment) || 0) }
+        ];
+    }
+    
+    if (tabFields.length === 0) {
+        return yPos; // No tab-specific fields
+    }
+    
+    // Calculate rows needed (4 fields per row)
+    const rowsNeeded = Math.ceil(tabFields.length / 4);
+    const tableWidth = contentWidth;
+    const tableX = margin;
+    const colWidth = tableWidth / 4;
+    const rowHeight = 12;
+    
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.5);
+    
+    // Draw each row
+    for (let row = 0; row < rowsNeeded; row++) {
+        const rowY = yPos + (row * rowHeight);
+        
+        // Draw up to 4 fields per row
+        for (let col = 0; col < 4; col++) {
+            const fieldIndex = (row * 4) + col;
+            if (fieldIndex < tabFields.length) {
+                const field = tabFields[fieldIndex];
+                const cellX = tableX + (col * colWidth);
+                
+                doc.rect(cellX, rowY, colWidth, rowHeight);
+                doc.setFontSize(8);
+                doc.setFont(undefined, 'bold');
+                doc.text(field.label, cellX + 5, rowY + 4);
+                doc.setFont(undefined, 'normal');
+                doc.text(field.value, cellX + 5, rowY + 9);
+            } else {
+                // Empty cell
+                const cellX = tableX + (col * colWidth);
+                doc.rect(cellX, rowY, colWidth, rowHeight);
+            }
+        }
+    }
+    
+    return yPos + (rowsNeeded * rowHeight) + 8;
+}
+
+// Add loan summary table (4x3 with merged header)
+function addLoanSummaryTable(doc, summary, margin, contentWidth, yPos) {
+    const tableWidth = contentWidth;
+    const tableX = margin;
+    const colWidth = tableWidth / 4;
+    const rowHeight = 12;
+    
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.5);
+    
+    // Row 1: Merged header "Loan Summary"
+    const headerY = yPos;
+    doc.rect(tableX, headerY, tableWidth, rowHeight);
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'bold');
+    const headerText = 'Loan Summary';
+    const headerWidth = doc.getTextWidth(headerText);
+    doc.text(headerText, tableX + (tableWidth - headerWidth) / 2, headerY + 8);
+    
+    // Row 2: First row of summary data
+    const row2Y = headerY + rowHeight;
+    
+    // Monthly Payment
+    doc.rect(tableX, row2Y, colWidth, rowHeight);
+    doc.setFontSize(8);
+    doc.setFont(undefined, 'bold');
+    doc.text('Monthly Payment', tableX + 5, row2Y + 4);
+    doc.setFont(undefined, 'normal');
+    doc.text(formatCurrency(summary.monthlyPayment || 0), tableX + 5, row2Y + 9);
+    
+    // Total Payments
+    doc.rect(tableX + colWidth, row2Y, colWidth, rowHeight);
+    doc.setFont(undefined, 'bold');
+    doc.text('Total Payments', tableX + colWidth + 5, row2Y + 4);
+    doc.setFont(undefined, 'normal');
+    doc.text(formatCurrency(summary.totalPayments || 0), tableX + colWidth + 5, row2Y + 9);
+    
+    // Total Interest
+    doc.rect(tableX + colWidth * 2, row2Y, colWidth, rowHeight);
+    doc.setFont(undefined, 'bold');
+    doc.text('Total Interest', tableX + colWidth * 2 + 5, row2Y + 4);
+    doc.setFont(undefined, 'normal');
+    doc.text(formatCurrency(summary.totalInterest || 0), tableX + colWidth * 2 + 5, row2Y + 9);
+    
+    // Total Principal
+    doc.rect(tableX + colWidth * 3, row2Y, colWidth, rowHeight);
+    doc.setFont(undefined, 'bold');
+    doc.text('Total Principal', tableX + colWidth * 3 + 5, row2Y + 4);
+    doc.setFont(undefined, 'normal');
+    doc.text(formatCurrency(summary.totalPrincipal || 0), tableX + colWidth * 3 + 5, row2Y + 9);
+    
+    // Row 3: Second row of summary data
+    const row3Y = row2Y + rowHeight;
+    
+    // Get first payment date and payment due day
+    let firstPaymentDate = 'Not Specified';
+    if (currentSchedule && currentSchedule.length > 0) {
+        firstPaymentDate = currentSchedule[0].date;
+    }
+    
+    const paymentDueDay = document.getElementById('paymentDueDay')?.value || 'first';
+    const paymentDueDayText = {
+        'first': '1st of each month',
+        'fifth': '5th of each month',
+        'tenth': '10th of each month',
+        'fifteenth': '15th of each month',
+        'same': 'Same as first payment date'
+    }[paymentDueDay] || '1st of each month';
+    
+    const finalPaymentAmount = currentSchedule && currentSchedule.length > 0 ? 
+        currentSchedule[currentSchedule.length - 1].payment : 0;
+    
+    // First Payment Date
+    doc.rect(tableX, row3Y, colWidth, rowHeight);
+    doc.setFont(undefined, 'bold');
+    doc.text('First Payment Date', tableX + 5, row3Y + 4);
+    doc.setFont(undefined, 'normal');
+    doc.text(firstPaymentDate, tableX + 5, row3Y + 9);
+    
+    // Payment Due Day
+    doc.rect(tableX + colWidth, row3Y, colWidth, rowHeight);
+    doc.setFont(undefined, 'bold');
+    doc.text('Payment Due Day', tableX + colWidth + 5, row3Y + 4);
+    doc.setFont(undefined, 'normal');
+    doc.text(paymentDueDayText, tableX + colWidth + 5, row3Y + 9);
+    
+    // Payoff Date
+    doc.rect(tableX + colWidth * 2, row3Y, colWidth, rowHeight);
+    doc.setFont(undefined, 'bold');
+    doc.text('Payoff Date', tableX + colWidth * 2 + 5, row3Y + 4);
+    doc.setFont(undefined, 'normal');
+    doc.text(summary.payoffDate || 'N/A', tableX + colWidth * 2 + 5, row3Y + 9);
+    
+    // Final Payoff Amount
+    doc.rect(tableX + colWidth * 3, row3Y, colWidth, rowHeight);
+    doc.setFont(undefined, 'bold');
+    doc.text('Final Payoff Amount', tableX + colWidth * 3 + 5, row3Y + 4);
+    doc.setFont(undefined, 'normal');
+    doc.text(formatCurrency(finalPaymentAmount), tableX + colWidth * 3 + 5, row3Y + 9);
+    
+    return row3Y + rowHeight + 8;
+}
+
+// Add chart image to PDF
+function addChartImage(doc, chartImage, margin, contentWidth, yPos, borrowerName = '') {
+    const imgWidth = contentWidth;
+    const imgHeight = imgWidth * 0.3; // Further reduced height to ensure it fits on page 1
+    
+    // Check if image fits on current page (more aggressive - leave less space for footer)
+    if (yPos + imgHeight > doc.internal.pageSize.getHeight() - 60) {
+        doc.addPage();
+        addFooter(doc, 1, doc.internal.pageSize.getWidth(), doc.internal.pageSize.getHeight(), margin, null, borrowerName);
+        yPos = margin + 15; // Reduced spacing
+    }
+    
+    doc.addImage(chartImage, 'PNG', margin, yPos, imgWidth, imgHeight);
+    
+    // Add border around chart with same style as summary table
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.5);
+    doc.rect(margin, yPos, imgWidth, imgHeight);
+    
+    yPos += imgHeight + 8; // Same spacing as between loan summary and chart
+    
+    // Add recasting warning box if loan type is recasting
+    if (currentLoanType === 'recasting') {
+        yPos = addRecastingWarning(doc, margin, contentWidth, yPos);
+    }
+    
+    // Add balloon warning box if loan type is balloon
+    if (currentLoanType === 'balloon') {
+        yPos = addBalloonWarning(doc, margin, contentWidth, yPos);
+    }
+    
+    // Add ARM warning box if loan type is arm
+    if (currentLoanType === 'arm') {
+        yPos = addARMWarning(doc, margin, contentWidth, yPos);
+    }
+    
+    return yPos;
+}
+
+// Add recasting warning box to PDF
+function addRecastingWarning(doc, margin, contentWidth, yPos) {
+    // Get current loan values for calculations - use standard field names
+    const loanAmountElement = document.getElementById('loanAmount');
+    const interestRateElement = document.getElementById('interestRate');
+    const loanTermElement = document.getElementById('loanTerm');
+    
+    // Get raw values and ensure they're proper numbers
+    const initialBalance = loanAmountElement ? parseFloat(loanAmountElement.value.replace(/[,$]/g, '')) || 0 : 0;
+    const interestRate = interestRateElement ? parseFloat(interestRateElement.value) || 0 : 0;
+    const loanTerm = loanTermElement ? parseFloat(loanTermElement.value) || 0 : 0;
+    
+    // Safety check for valid values
+    if (!initialBalance || !interestRate || !loanTerm) {
+        return yPos; // Skip warning if no valid data
+    }
+    
+    // Calculate example values - use 25% of loan amount as example prepayment
+    const quarterPrepayment = initialBalance * 0.25;
+    const initialMonthlyPayment = calculateMonthlyPayment(initialBalance, interestRate, loanTerm * 12);
+    
+    // Calculate balance at end of year 1 without prepayments
+    let tempBalance = initialBalance;
+    const monthlyRate = interestRate / 100 / 12;
+    for (let i = 0; i < 12; i++) {
+        const interestPayment = tempBalance * monthlyRate;
+        const principalPayment = initialMonthlyPayment - interestPayment;
+        tempBalance -= principalPayment;
+    }
+    const balanceEndYear1 = tempBalance;
+    
+    // Calculate new balance after prepayment and new payment
+    const newBalanceAfterPrepay = balanceEndYear1 - quarterPrepayment;
+    const remainingYears = loanTerm - 1;
+    const newMonthlyPayment = calculateMonthlyPayment(newBalanceAfterPrepay, interestRate, remainingYears * 12);
+    
+    // Warning box dimensions - calculate height dynamically
+    const textMargin = margin + 5;
+    const maxWidth = contentWidth - 10;
+    
+    // Calculate text dimensions first
+    doc.setTextColor(255, 0, 0); // Red text
+    doc.setFontSize(8);
+    doc.setFont(undefined, 'bold');
+    
+    const lineHeight = 4; // Single spacing
+    let textLines = [];
+    
+    // WARNING text
+    const warningText = `WARNING: EACH YEAR, ON THE ANNIVERSARY OF THIS NOTE (THE "NOTE RECAST DATE"), THE PAYMENTS DUE HEREUNDER WILL BE RECALCULATED BY REDUCING THE PRINCIPAL BALANCE OWED BY THE SUM OF ANY PARTIAL PRE-PAYMENT(S) IN THE PRIOR YEAR, AND THEN RE-AMORTIZING THE LOAN AT THE ORIGINAL INTEREST RATE OVER THE REMAINING TERM OF THE ORIGINAL ${loanTerm}-YEAR NOTE TERM.`;
+    
+    const warningLines = doc.splitTextToSize(warningText, maxWidth);
+    textLines = textLines.concat(warningLines);
+    
+    // EXAMPLE text
+    const exampleText = `EXAMPLE: FOR A NOTE WITH AN INITIAL PRINCIPAL BALANCE OF ${formatCurrency(initialBalance)}, AMORTIZED OVER ${loanTerm} YEARS AT ${interestRate}%, IF IN YEAR ONE, THE MAKER OF THIS NOTE PAYS AN ADDITIONAL ${formatCurrency(quarterPrepayment)} TOWARD THE PRINCIPAL, THEN ON THE NOTE RECAST DATE, THIS NOTE WILL BE RE-AMORTIZED OVER THE ${remainingYears} YEARS REMAINING OF THE ORIGINAL ${loanTerm}-YEAR NOTE PERIOD. AT THE OUTSET, MONTHLY PAYMENTS WOULD BE ${formatCurrency(initialMonthlyPayment)}. AT THE END OF YEAR ONE, THE PRINCIPAL BALANCE, IF NO PARTIAL PRE-PAYMENT(S) HAD BEEN MADE, WOULD HAVE BEEN ${formatCurrency(balanceEndYear1)}. AFTER REDUCING THE PRINCIPAL BALANCE BY THE ${formatCurrency(quarterPrepayment)} IN PARTIAL PRE-PAYMENT(S), THE REMAINING PRINCIPAL BALANCE WOULD BE ${formatCurrency(newBalanceAfterPrepay)}. SAID ${formatCurrency(newBalanceAfterPrepay)} WOULD BE RE-AMORTIZED AT THE ORIGINAL INTEREST RATE (${interestRate}%) OVER THE REMAINING ${remainingYears} YEARS OF THE ORIGINAL ${loanTerm}-YEAR NOTE PERIOD. THIS WOULD CAUSE THE MONTHLY PAYMENTS TO BE REDUCED TO ${formatCurrency(newMonthlyPayment)} PER MONTH.`;
+    
+    const exampleLines = doc.splitTextToSize(exampleText, maxWidth);
+    textLines = textLines.concat(exampleLines);
+    
+    // Calculate actual box height needed
+    const totalTextLines = textLines.length;
+    const boxHeight = 20 + (totalTextLines * lineHeight) + 3; // Top margin + text + small bottom margin
+    
+    // Draw warning box border
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.5);
+    doc.rect(margin, yPos, contentWidth, boxHeight);
+    
+    // Now draw the text
+    let textY = yPos + 10;
+    
+    // Draw warning lines with justification
+    warningLines.forEach((line, index) => {
+        if (index === warningLines.length - 1) {
+            // Last line - don't justify
+            doc.text(line, textMargin, textY);
+        } else {
+            // Justify the line
+            doc.text(line, textMargin, textY, { align: 'justify', maxWidth: maxWidth });
+        }
+        textY += lineHeight;
+    });
+    
+    textY += 3; // Reduced extra space before example
+    
+    // Draw example lines with justification
+    exampleLines.forEach((line, index) => {
+        if (index === exampleLines.length - 1) {
+            // Last line - don't justify
+            doc.text(line, textMargin, textY);
+        } else {
+            // Justify the line
+            doc.text(line, textMargin, textY, { align: 'justify', maxWidth: maxWidth });
+        }
+        textY += lineHeight;
+    });
+    
+    // Reset text color to black
+    doc.setTextColor(0, 0, 0);
+    
+    return yPos + boxHeight + 10;
+}
+
+// Add balloon warning box to PDF
+function addBalloonWarning(doc, margin, contentWidth, yPos) {
+    // Get current loan values for calculations - use balloon field names
+    const loanAmountElement = document.getElementById('loanAmount');
+    const interestRateElement = document.getElementById('interestRate');
+    const amortizationPeriodElement = document.getElementById('amortizationPeriod');
+    const balloonTermElement = document.getElementById('balloonTerm');
+    const startDateElement = document.getElementById('startDate');
+    
+    // Get raw values and ensure they're proper numbers
+    const initialBalance = loanAmountElement ? parseFloat(loanAmountElement.value.replace(/[,$]/g, '')) || 0 : 0;
+    const interestRate = interestRateElement ? parseFloat(interestRateElement.value) || 0 : 0;
+    const amortizationPeriod = amortizationPeriodElement ? parseFloat(amortizationPeriodElement.value) || 0 : 0;
+    const balloonTerm = balloonTermElement ? parseFloat(balloonTermElement.value) || 0 : 0;
+    const startDate = startDateElement ? startDateElement.value : new Date().toISOString().split('T')[0];
+    
+    // Safety check for valid values
+    if (!initialBalance || !interestRate || !amortizationPeriod || !balloonTerm) {
+        return yPos; // Skip warning if no valid data
+    }
+    
+    // Calculate balloon amount (remaining balance after balloon term)
+    const monthlyPayment = calculateMonthlyPayment(initialBalance, interestRate, amortizationPeriod * 12);
+    let balloonBalance = initialBalance;
+    const monthlyRate = interestRate / 100 / 12;
+    
+    // Calculate remaining balance after balloon term months
+    for (let i = 0; i < balloonTerm * 12; i++) {
+        const interestPayment = balloonBalance * monthlyRate;
+        const principalPayment = monthlyPayment - interestPayment;
+        balloonBalance -= principalPayment;
+        if (balloonBalance <= 0) break;
+    }
+    
+    // Calculate final due date
+    const finalDate = new Date(startDate);
+    finalDate.setFullYear(finalDate.getFullYear() + balloonTerm);
+    const finalDueDateString = finalDate.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+    }).toUpperCase();
+    
+    // Warning box dimensions - calculate height dynamically
+    const textMargin = margin + 5;
+    const maxWidth = contentWidth - 10;
+    
+    // Calculate text dimensions first
+    doc.setTextColor(255, 0, 0); // Red text
+    doc.setFontSize(8);
+    doc.setFont(undefined, 'bold');
+    
+    const lineHeight = 4; // Single spacing
+    let textLines = [];
+    
+    // WARNING text
+    const warningText = `WARNING: THIS IS A BALLOON NOTE. EVEN THOUGH YOUR NOTE IS AMORTIZED OVER ${amortizationPeriod} YEARS, THE ENTIRE REMAINING BALANCE OF APPROXIMATELY ${formatCurrency(balloonBalance)} WILL BE DUE IN ${balloonTerm} YEARS. AS SUCH, THE FINAL PAYMENT OF THE BALANCE DUE UPON MATURITY IS PROJECTED TO BE ${formatCurrency(balloonBalance)} WHICH WILL BE DUE ON ${finalDueDateString}, TOGETHER WITH ACCRUED INTEREST, IF ANY, AND ALL ADVANCEMENTS MADE BY THE MORTGAGEE UNDER THE TERMS OF THE MORTGAGE.`;
+    
+    const warningLines = doc.splitTextToSize(warningText, maxWidth);
+    textLines = textLines.concat(warningLines);
+    
+    // Calculate actual box height needed
+    const totalTextLines = textLines.length;
+    const boxHeight = 20 + (totalTextLines * lineHeight) + 3; // Top margin + text + small bottom margin
+    
+    // Draw warning box border
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.5);
+    doc.rect(margin, yPos, contentWidth, boxHeight);
+    
+    // Now draw the text
+    let textY = yPos + 10;
+    
+    // Draw warning lines with justification
+    warningLines.forEach((line, index) => {
+        if (index === warningLines.length - 1) {
+            // Last line - don't justify
+            doc.text(line, textMargin, textY);
+        } else {
+            // Justify the line
+            doc.text(line, textMargin, textY, { align: 'justify', maxWidth: maxWidth });
+        }
+        textY += lineHeight;
+    });
+    
+    // Reset text color to black
+    doc.setTextColor(0, 0, 0);
+    
+    return yPos + boxHeight + 10;
+}
+
+// Add ARM warning box to PDF
+function addARMWarning(doc, margin, contentWidth, yPos) {
+    // Get current loan values for calculations - use ARM field names
+    const loanAmountElement = document.getElementById('loanAmount');
+    const fullyIndexedRateElement = document.getElementById('fullyIndexedRate');
+    const loanTermElement = document.getElementById('loanTerm');
+    const marginElement = document.getElementById('margin');
+    const lifetimeCapElement = document.getElementById('lifetimeCap');
+    const fixedPeriodElement = document.getElementById('fixedPeriod');
+    const armIndexElement = document.getElementById('armIndex');
+    const customIndexElement = document.getElementById('customIndex');
+    
+    // Get raw values and ensure they're proper numbers
+    const initialBalance = loanAmountElement ? parseFloat(loanAmountElement.value.replace(/[,$]/g, '')) || 0 : 0;
+    const initialRate = fullyIndexedRateElement ? parseFloat(fullyIndexedRateElement.value) || 0 : 0;
+    const loanTerm = loanTermElement ? parseFloat(loanTermElement.value) || 0 : 0;
+    const armMargin = marginElement ? parseFloat(marginElement.value) || 0 : 0;
+    const lifetimeCap = lifetimeCapElement ? parseFloat(lifetimeCapElement.value) || 0 : 0;
+    const fixedPeriod = fixedPeriodElement ? parseFloat(fixedPeriodElement.value) || 5 : 5;
+    
+    // Get index information
+    const selectedIndex = armIndexElement ? armIndexElement.value : 'SOFR';
+    const customIndexName = customIndexElement ? customIndexElement.value : '';
+    const indexDisplayName = selectedIndex === 'Other' ? customIndexName : selectedIndex;
+    
+    // Safety check for valid values
+    if (!initialBalance || !initialRate || !loanTerm) {
+        return yPos; // Skip warning if no valid data
+    }
+    
+    // Calculate initial payment during fixed period
+    const initialMonthlyPayment = calculateMonthlyPayment(initialBalance, initialRate, loanTerm * 12);
+    
+    // Calculate maximum possible rate (initial + lifetime cap)
+    const maxPossibleRate = initialRate + lifetimeCap;
+    
+    // Calculate example payment at max rate (worst case scenario)
+    // Calculate remaining balance after fixed period
+    let balanceAfterFixed = initialBalance;
+    const monthlyRate = initialRate / 100 / 12;
+    for (let i = 0; i < fixedPeriod * 12; i++) {
+        const interestPayment = balanceAfterFixed * monthlyRate;
+        const principalPayment = initialMonthlyPayment - interestPayment;
+        balanceAfterFixed -= principalPayment;
+        if (balanceAfterFixed <= 0) break;
+    }
+    
+    // Calculate payment at maximum rate for remaining term
+    const remainingMonths = (loanTerm - fixedPeriod) * 12;
+    const maxRatePayment = remainingMonths > 0 ? calculateMonthlyPayment(balanceAfterFixed, maxPossibleRate, remainingMonths) : 0;
+    
+    // Warning box dimensions - calculate height dynamically
+    const textMargin = margin + 5;
+    const maxWidth = contentWidth - 10;
+    
+    // Calculate text dimensions first
+    doc.setTextColor(255, 0, 0); // Red text
+    doc.setFontSize(8);
+    doc.setFont(undefined, 'bold');
+    
+    const lineHeight = 4; // Single spacing
+    let textLines = [];
+    
+    // WARNING text
+    const warningText = `WARNING: THIS IS AN ADJUSTABLE RATE MORTGAGE (ARM). YOUR INITIAL INTEREST RATE OF ${initialRate}% IS FIXED FOR THE FIRST ${fixedPeriod} YEARS, AFTER WHICH YOUR RATE MAY ADJUST ANNUALLY BASED ON THE ${indexDisplayName} INDEX PLUS A MARGIN OF ${armMargin}%. YOUR PAYMENT DURING THE INITIAL ${fixedPeriod}-YEAR PERIOD WILL BE ${formatCurrency(initialMonthlyPayment)} PER MONTH. AFTER THE INITIAL PERIOD, YOUR INTEREST RATE CAN INCREASE UP TO A LIFETIME MAXIMUM OF ${maxPossibleRate}% (${initialRate}% + ${lifetimeCap}% LIFETIME CAP). IF YOUR RATE REACHES THE MAXIMUM OF ${maxPossibleRate}%, YOUR MONTHLY PAYMENT COULD INCREASE TO AS MUCH AS ${formatCurrency(maxRatePayment)} PER MONTH. YOUR ACTUAL PAYMENT ADJUSTMENTS WILL DEPEND ON THE PREVAILING ${indexDisplayName} RATE AT THE TIME OF EACH ADJUSTMENT. PLEASE ENSURE YOU CAN AFFORD POTENTIAL PAYMENT INCREASES BEFORE PROCEEDING WITH THIS LOAN.`;
+    
+    const warningLines = doc.splitTextToSize(warningText, maxWidth);
+    textLines = textLines.concat(warningLines);
+    
+    // Calculate actual box height needed
+    const totalTextLines = textLines.length;
+    const boxHeight = 20 + (totalTextLines * lineHeight) + 3; // Top margin + text + small bottom margin
+    
+    // Draw warning box border
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.5);
+    doc.rect(margin, yPos, contentWidth, boxHeight);
+    
+    // Now draw the text
+    let textY = yPos + 10;
+    
+    // Draw warning lines with justification
+    warningLines.forEach((line, index) => {
+        if (index === warningLines.length - 1) {
+            // Last line - don't justify
+            doc.text(line, textMargin, textY);
+        } else {
+            // Justify the line
+            doc.text(line, textMargin, textY, { align: 'justify', maxWidth: maxWidth });
+        }
+        textY += lineHeight;
+    });
+    
+    // Reset text color to black
+    doc.setTextColor(0, 0, 0);
+    
+    return yPos + boxHeight + 10;
+}
+
+// Add amortization schedule to PDF
+function addAmortizationSchedule(doc, margin, contentWidth, pageWidth, pageHeight, borrowerName = '') {
+    let currentPage = 2;
+    let yPos = margin + 15; // Reduced initial spacing
+    
+    // Page title
+    doc.setFontSize(18);
+    doc.setFont(undefined, 'bold');
+    const scheduleTitle = 'Amortization Schedule';
+    const scheduleTitleWidth = doc.getTextWidth(scheduleTitle);
+    doc.text(scheduleTitle, (pageWidth - scheduleTitleWidth) / 2, yPos);
+    yPos += 8; // Reduced spacing to bring title closer to table
+    
+    // Table setup
+    const headers = ['Month', 'Date', 'Payment', 'Principal', 'Interest', 'Balance'];
+    const colWidth = contentWidth / headers.length;
+    const rowHeight = 6; // Much smaller row height for maximum density
+    const headerHeight = 10; // Smaller header height
+    
+    // Draw table header
+    yPos = drawTableHeader(doc, headers, margin, contentWidth, colWidth, headerHeight, yPos);
+    
+    // Draw table rows
+    doc.setFontSize(8); // Smaller data font for more compact rows
+    doc.setFont(undefined, 'normal');
+    
+    currentSchedule.forEach((row, index) => {
+        // Check if we need a new page - use more page space
+        if (yPos + rowHeight > pageHeight - 25) { // Much smaller footer space for maximum content
+            addFooter(doc, currentPage, pageWidth, pageHeight, margin, null, borrowerName);
+            doc.addPage();
+            currentPage++;
+            yPos = margin + 10; // Minimal top spacing
+            
+            // Redraw only header on new page (no title)
+            yPos = drawTableHeader(doc, headers, margin, contentWidth, colWidth, headerHeight, yPos);
+            doc.setFontSize(8); // Smaller data font
+            doc.setFont(undefined, 'normal');
+        }
+        
+        // Draw row
+        const rowData = [
+            row.month.toString(),
+            row.date,
+            formatCurrency(row.payment),
+            formatCurrency(row.principal),
+            formatCurrency(row.interest),
+            formatCurrency(row.balance)
+        ];
+        
+        drawTableRow(doc, rowData, margin, colWidth, rowHeight, yPos);
+        yPos += rowHeight;
+    });
+    
+    // Add footer to last page
+    const totalPages = doc.internal.getNumberOfPages();
+    addFooter(doc, totalPages, pageWidth, pageHeight, margin, totalPages, borrowerName);
+    
+    // Add footers to all pages with correct page numbers
+    for (let i = 2; i <= totalPages; i++) {
+        doc.setPage(i);
+        addFooter(doc, i, pageWidth, pageHeight, margin, totalPages, borrowerName);
+    }
+    
+    // Fix page 1 footer with correct total pages
+    doc.setPage(1);
+    addFooter(doc, 1, pageWidth, pageHeight, margin, totalPages, borrowerName);
+}
+
+// Draw table header
+function drawTableHeader(doc, headers, margin, contentWidth, colWidth, headerHeight, yPos) {
+    doc.setFontSize(9); // Smaller header font
+    doc.setFont(undefined, 'bold');
+    doc.setFillColor(240, 240, 240);
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.5);
+    
+    // Draw header background
+    doc.rect(margin, yPos, contentWidth, headerHeight, 'FD');
+    
+    // Draw header text and column separators
+    headers.forEach((header, index) => {
+        const xPos = margin + (index * colWidth);
+        
+        // Draw vertical line (except before first column)
+        if (index > 0) {
+            doc.line(xPos, yPos, xPos, yPos + headerHeight);
+        }
+        
+        // Center text in column both horizontally and vertically
+        const headerWidth = doc.getTextWidth(header);
+        const textX = xPos + (colWidth - headerWidth) / 2;
+        const textYCenter = yPos + (headerHeight / 2) + 2.5; // Center text vertically in header
+        doc.text(header, textX, textYCenter);
+    });
+    
+    return yPos + headerHeight;
+}
+
+// Draw table row
+function drawTableRow(doc, rowData, margin, colWidth, rowHeight, yPos) {
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.5);
+    
+    // Draw row border
+    doc.rect(margin, yPos, colWidth * rowData.length, rowHeight);
+    
+    // Draw data and column separators
+    rowData.forEach((data, index) => {
+        const xPos = margin + (index * colWidth);
+        
+        // Draw vertical line (except before first column)
+        if (index > 0) {
+            doc.line(xPos, yPos, xPos, yPos + rowHeight);
+        }
+        
+        // Center text in column both horizontally and vertically
+        const dataWidth = doc.getTextWidth(data);
+        const textX = xPos + (colWidth - dataWidth) / 2;
+        const textYCenter = yPos + (rowHeight / 2) + 2; // Center text vertically in row
+        doc.text(data, textX, textYCenter);
+    });
+}
+
+// Add footer to page
+function addFooter(doc, pageNum, pageWidth, pageHeight, margin, totalPages = null, borrowerName = '') {
+    const bottomMargin = 20; // Much smaller bottom margin for footer
+    const footerY = pageHeight - bottomMargin + 5; // Position footer closer to bottom
+    
+    // Draw line above footer
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.5);
+    doc.line(margin, footerY - 5, pageWidth - margin, footerY - 5); // Line closer to text
+    
+    // Footer text
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    
+    // Left side: "Amortization Schedule [borrower(s)]"
+    const footerText = borrowerName ? `Amortization Schedule [${borrowerName}]` : 'Amortization Schedule';
+    doc.text(footerText, margin, footerY);
+    
+    // Right side: "Page X of Y"
+    if (totalPages) {
+        const pageText = `Page ${pageNum} of ${totalPages}`;
+        const pageTextWidth = doc.getTextWidth(pageText);
+        doc.text(pageText, pageWidth - margin - pageTextWidth, footerY);
+    }
+}
+
+// Get summary data for PDF
+function getSummaryData() {
+    if (!currentSchedule || currentSchedule.length === 0) {
+        return {};
+    }
+    
+    const lastRow = currentSchedule[currentSchedule.length - 1];
+    const monthlyPayment = currentSchedule[0].payment;
+    const totalPayments = currentSchedule.reduce((sum, row) => sum + row.payment, 0);
+    
+    return {
+        monthlyPayment,
+        totalPayments,
+        totalInterest: lastRow.totalInterest,
+        totalPrincipal: lastRow.totalPrincipal,
+        payoffDate: lastRow.date
+    };
+}
+
+// File save/load functionality
+function saveCalculationData() {
+    const data = {
+        caseName: document.getElementById('caseName').value,
+        loanType: currentLoanType,
+        timestamp: new Date().toISOString(),
+        schedule: currentSchedule,
+        inputs: getCurrentInputValues()
+    };
+    
+    const jsonString = JSON.stringify(data, null, 2);
+    const saveDate = new Date().toISOString().split('T')[0];
+    const filename = `${data.caseName || 'Amortization'} ${saveDate}.json`;
+    
+    downloadFile(jsonString, filename, 'application/json');
+}
+
+function getCurrentInputValues() {
+    const inputs = {};
+    // Get inputs from all containers: common fields, tab-specific fields, and any standalone inputs
+    const inputElements = document.querySelectorAll(
+        '#commonFieldsContainer input, #commonFieldsContainer select, ' +
+        '#tabSpecificFieldsContainer input, #tabSpecificFieldsContainer select, ' +
+        'input, select'
+    );
+    
+    inputElements.forEach(element => {
+        // Only save inputs that have an ID (avoid duplicates and unnamed elements)
+        if (element.id) {
+            if (element.type === 'checkbox') {
+                inputs[element.id] = element.checked;
+            } else if (element.type === 'number') {
+                inputs[element.id] = parseFloat(element.value) || 0;
+            } else {
+                inputs[element.id] = element.value;
+            }
+        }
+    });
+    
+    // Also save shared field values to ensure synchronization
+    if (window.sharedFieldValues) {
+        inputs.sharedFieldValues = window.sharedFieldValues;
+    }
+    
+    return inputs;
+}
+
+async function loadCalculationData(file) {
+    try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        
+        // Set case name
+        document.getElementById('caseName').value = data.caseName || '';
+        
+        // Set loan type
+        if (data.loanType && data.loanType !== currentLoanType) {
+            switchLoanType(data.loanType);
+        }
+        
+        // Wait for fields to be created
+        setTimeout(() => {
+            // Restore shared field values first if they exist
+            if (data.inputs && data.inputs.sharedFieldValues) {
+                window.sharedFieldValues = { ...window.sharedFieldValues, ...data.inputs.sharedFieldValues };
+            }
+            
+            // Restore input values
+            Object.entries(data.inputs || {}).forEach(([key, value]) => {
+                // Skip the sharedFieldValues object (we handled it above)
+                if (key === 'sharedFieldValues') return;
+                
+                const element = document.getElementById(key);
+                if (element) {
+                    if (element.type === 'checkbox') {
+                        element.checked = value;
+                    } else {
+                        element.value = value;
+                    }
+                    
+                    // Trigger synchronization for synchronized fields
+                    if (window.sharedFieldValues && window.sharedFieldValues.hasOwnProperty(key)) {
+                        window.sharedFieldValues[key] = value;
+                        // Trigger input event to sync field across tabs
+                        element.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                }
+            });
+            
+            // Recalculate with loaded data
+            calculateCurrentLoanType();
+        }, 200); // Increased timeout to allow for field synchronization
+        
+    } catch (error) {
+        alert('Error loading file: ' + error.message);
+    }
+}
+
+// Payoff Calculator PDF Generation functionality
+async function generatePayoffCalculatorPDF() {
+    try {
+        const pdfBlob = await createPayoffCalculatorPDFDocument();
+        if (pdfBlob) {
+            const pdfUrl = URL.createObjectURL(pdfBlob);
+            window.open(pdfUrl, '_blank');
+        }
+    } catch (error) {
+        console.error('Error generating Payoff Calculator PDF:', error);
+        alert('Error generating PDF. Please try again.');
+    }
+}
+
+async function createPayoffCalculatorPDFDocument() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // Page dimensions - 0.5" margins
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 18; // 0.25 inches (0.25 * 72 = 18 points)
+    const contentWidth = pageWidth - (margin * 2);
+    
+    // Get data
+    const caseName = document.getElementById('caseName').value;
+    const borrowerName = caseName; // Use caseName as borrower name for footer
+    const summary = getPayoffCalculatorSummaryData();
+    const chartImage = await captureChartAsImage();
+    
+    // PAGE 1: Summary Page
+    let yPos = margin + 15;
+    
+    // Title: "Payoff Calculator" (centered)
+    doc.setFontSize(20);
+    doc.setFont(undefined, 'bold');
+    const title = 'Payoff Calculator';
+    const titleWidth = doc.getTextWidth(title);
+    doc.text(title, (pageWidth - titleWidth) / 2, yPos);
+    yPos += 10;
+
+    // Case name (centered, if provided)
+    if (caseName) {
+        doc.setFontSize(16);
+        doc.setFont(undefined, 'normal');
+        const caseWidth = doc.getTextWidth(caseName);
+        doc.text(caseName, (pageWidth - caseWidth) / 2, yPos);
+        yPos += 10;
+    }
+    
+    // Common Fields Table
+    yPos = addPayoffCalculatorCommonFieldsTable(doc, summary, margin, contentWidth, yPos);
+    
+    // Skip the redundant tab-specific fields table since Present Balance and Payoff Date are covered in Payoff Summary
+    
+    // Loan Summary Table
+    yPos = addPayoffCalculatorLoanSummaryTable(doc, summary, margin, contentWidth, yPos);
+    
+    // Payoff Summary Section
+    yPos = addPayoffCalculatorPayoffSummary(doc, summary, margin, contentWidth, yPos);
+    
+    // Chart image
+    if (chartImage) {
+        yPos = addChartImage(doc, chartImage, margin, contentWidth, yPos, borrowerName);
+    }
+    
+    // Add footer to page 1
+    addFooter(doc, 1, pageWidth, pageHeight, margin, null, borrowerName);
+    
+    // PAGE 2+: Amortization Schedule
+    doc.addPage();
+    addAmortizationSchedule(doc, margin, contentWidth, pageWidth, pageHeight, borrowerName);
+    
+    return doc.output('blob');
+}
+
+// Add common fields table for payoff calculator (4-column layout mirroring webapp)
+function addPayoffCalculatorCommonFieldsTable(doc, summary, margin, contentWidth, yPos) {
+    // Get common field values
+    const borrowerName = document.getElementById('caseName')?.value || 'Not Specified';
+    const loanAmount = document.getElementById('loanAmount')?.value || 'Not Specified';
+    const loanTermYears = document.getElementById('loanTermYears')?.value || '0';
+    const loanTermMonths = document.getElementById('loanTermMonths')?.value || '0';
+    const interestRate = document.getElementById('interestRate')?.value || 'Not Specified';
+    const startDate = document.getElementById('startDate')?.value || 'Not Specified';
+    const firstPaymentDate = document.getElementById('firstPaymentDate')?.value || 'Not Specified';
+    const paymentDueDay = document.getElementById('paymentDueDay')?.value || 'first';
+    
+    // Format loan term
+    const years = parseInt(loanTermYears);
+    const months = parseInt(loanTermMonths);
+    let loanTermText = 'Not Specified';
+    if (years > 0 || months > 0) {
+        if (years > 0 && months > 0) {
+            loanTermText = `${years} Years, ${months} Months`;
+        } else if (years > 0) {
+            loanTermText = `${years} Year${years > 1 ? 's' : ''}`;
+        } else {
+            loanTermText = `${months} Month${months > 1 ? 's' : ''}`;
+        }
+    }
+    
+    // Format payment due day
+    const paymentDueDayText = {
+        'first': '1st of each month',
+        'fifth': '5th of each month',
+        'tenth': '10th of each month',
+        'fifteenth': '15th of each month',
+        'same': 'Same as first payment date'
+    }[paymentDueDay] || '1st of each month';
+    
+    // Table dimensions - 4 columns, 2 rows
+    const tableWidth = contentWidth;
+    const tableX = margin;
+    const colWidth = tableWidth / 4;
+    const rowHeight = 12;
+    
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.5);
+    
+    // Row 1
+    const row1Y = yPos;
+    
+    // A1: Borrower(s) - merged A1:B1
+    doc.rect(tableX, row1Y, colWidth * 2, rowHeight);
+    doc.setFontSize(8);
+    doc.setFont(undefined, 'bold');
+    doc.text('Borrower(s)', tableX + 5, row1Y + 4);
+    doc.setFont(undefined, 'normal');
+    doc.text(borrowerName, tableX + 5, row1Y + 9);
+    
+    // C1: Loan Term
+    doc.rect(tableX + colWidth * 2, row1Y, colWidth, rowHeight);
+    doc.setFont(undefined, 'bold');
+    doc.text('Loan Term', tableX + colWidth * 2 + 5, row1Y + 4);
+    doc.setFont(undefined, 'normal');
+    doc.text(loanTermText, tableX + colWidth * 2 + 5, row1Y + 9);
+    
+    // D1: Interest Rate
+    doc.rect(tableX + colWidth * 3, row1Y, colWidth, rowHeight);
+    doc.setFont(undefined, 'bold');
+    doc.text('Interest Rate (%)', tableX + colWidth * 3 + 5, row1Y + 4);
+    doc.setFont(undefined, 'normal');
+    doc.text(interestRate !== 'Not Specified' ? interestRate + '%' : 'Not Specified', tableX + colWidth * 3 + 5, row1Y + 9);
+    
+    // Row 2
+    const row2Y = row1Y + rowHeight;
+    
+    // A2: Start Date
+    doc.rect(tableX, row2Y, colWidth, rowHeight);
+    doc.setFont(undefined, 'bold');
+    doc.text('Start Date', tableX + 5, row2Y + 4);
+    doc.setFont(undefined, 'normal');
+    doc.text(startDate, tableX + 5, row2Y + 9);
+    
+    // B2: First Payment Date
+    doc.rect(tableX + colWidth, row2Y, colWidth, rowHeight);
+    doc.setFont(undefined, 'bold');
+    doc.text('First Payment Date', tableX + colWidth + 5, row2Y + 4);
+    doc.setFont(undefined, 'normal');
+    doc.text(firstPaymentDate, tableX + colWidth + 5, row2Y + 9);
+    
+    // C2: Payment Due Day
+    doc.rect(tableX + colWidth * 2, row2Y, colWidth, rowHeight);
+    doc.setFont(undefined, 'bold');
+    doc.text('Payment Due Day', tableX + colWidth * 2 + 5, row2Y + 4);
+    doc.setFont(undefined, 'normal');
+    doc.text(paymentDueDayText, tableX + colWidth * 2 + 5, row2Y + 9);
+    
+    // D2: Loan Amount
+    doc.rect(tableX + colWidth * 3, row2Y, colWidth, rowHeight);
+    doc.setFont(undefined, 'bold');
+    doc.text('Loan Amount ($)', tableX + colWidth * 3 + 5, row2Y + 4);
+    doc.setFont(undefined, 'normal');
+    const loanAmountFormatted = loanAmount !== 'Not Specified' ? formatCurrency(parseFloat(loanAmount.replace(/,/g, '')) || 0) : 'Not Specified';
+    doc.text(loanAmountFormatted, tableX + colWidth * 3 + 5, row2Y + 9);
+    
+    return row2Y + rowHeight + 8;
+}
+
+// Add tab-specific fields table for payoff calculator (4-column layout)
+function addPayoffCalculatorTabSpecificFieldsTable(doc, summary, margin, contentWidth, yPos) {
+    const presentBalance = document.getElementById('presentBalance')?.value || '0';
+    const payoffDate = document.getElementById('payoffDate')?.value || 'Not Specified';
+    
+    const tabFields = [
+        { label: 'Present Balance', value: formatCurrency(parseFloat(presentBalance) || 0) },
+        { label: 'Payoff Date', value: payoffDate }
+    ];
+    
+    // Calculate rows needed (4 fields per row)
+    const rowsNeeded = Math.ceil(tabFields.length / 4);
+    const tableWidth = contentWidth;
+    const tableX = margin;
+    const colWidth = tableWidth / 4;
+    const rowHeight = 12;
+    
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.5);
+    
+    // Draw each row
+    for (let row = 0; row < rowsNeeded; row++) {
+        const rowY = yPos + (row * rowHeight);
+        
+        // Draw up to 4 fields per row
+        for (let col = 0; col < 4; col++) {
+            const fieldIndex = (row * 4) + col;
+            if (fieldIndex < tabFields.length) {
+                const field = tabFields[fieldIndex];
+                const cellX = tableX + (col * colWidth);
+                
+                doc.rect(cellX, rowY, colWidth, rowHeight);
+                doc.setFontSize(8);
+                doc.setFont(undefined, 'bold');
+                doc.text(field.label, cellX + 5, rowY + 4);
+                doc.setFont(undefined, 'normal');
+                doc.text(field.value, cellX + 5, rowY + 9);
+            } else {
+                // Empty cell
+                const cellX = tableX + (col * colWidth);
+                doc.rect(cellX, rowY, colWidth, rowHeight);
+            }
+        }
+    }
+    
+    return yPos + (rowsNeeded * rowHeight) + 8;
+}
+
+// Add loan summary table for payoff calculator (4x3 with merged header)
+function addPayoffCalculatorLoanSummaryTable(doc, summary, margin, contentWidth, yPos) {
+    const tableWidth = contentWidth;
+    const tableX = margin;
+    const colWidth = tableWidth / 4;
+    const rowHeight = 12;
+    
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.5);
+    
+    // Row 1: Merged header "Loan Summary"
+    const headerY = yPos;
+    doc.rect(tableX, headerY, tableWidth, rowHeight);
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'bold');
+    const headerText = 'Payoff Calculation Summary';
+    const headerWidth = doc.getTextWidth(headerText);
+    doc.text(headerText, tableX + (tableWidth - headerWidth) / 2, headerY + 8);
+    
+    // Row 2: First row of payoff data
+    const row2Y = headerY + rowHeight;
+    
+    // Current Balance
+    doc.rect(tableX, row2Y, colWidth, rowHeight);
+    doc.setFontSize(8);
+    doc.setFont(undefined, 'bold');
+    doc.text('Current Balance', tableX + 5, row2Y + 4);
+    doc.setFont(undefined, 'normal');
+    doc.text(formatCurrency(summary.currentBalance || 0), tableX + 5, row2Y + 9);
+    
+    // Principal Paydown
+    doc.rect(tableX + colWidth, row2Y, colWidth, rowHeight);
+    doc.setFont(undefined, 'bold');
+    doc.text('Principal Paydown', tableX + colWidth + 5, row2Y + 4);
+    doc.setFont(undefined, 'normal');
+    doc.text(formatCurrency(summary.principalPaydown || 0), tableX + colWidth + 5, row2Y + 9);
+    
+    // Balance After Last Payment
+    doc.rect(tableX + colWidth * 2, row2Y, colWidth, rowHeight);
+    doc.setFont(undefined, 'bold');
+    doc.text('Balance After Last Payment', tableX + colWidth * 2 + 5, row2Y + 4);
+    doc.setFont(undefined, 'normal');
+    doc.text(formatCurrency(summary.balanceAfterPayments || 0), tableX + colWidth * 2 + 5, row2Y + 9);
+    
+    // Days to Payoff
+    doc.rect(tableX + colWidth * 3, row2Y, colWidth, rowHeight);
+    doc.setFont(undefined, 'bold');
+    doc.text('Days to Payoff', tableX + colWidth * 3 + 5, row2Y + 4);
+    doc.setFont(undefined, 'normal');
+    doc.text(summary.daysToPayoff || 'Not Calculated', tableX + colWidth * 3 + 5, row2Y + 9);
+    
+    // Row 3: Second row of payoff data
+    const row3Y = row2Y + rowHeight;
+    
+    // Daily Interest Amount
+    doc.rect(tableX, row3Y, colWidth, rowHeight);
+    doc.setFont(undefined, 'bold');
+    doc.text('Daily Interest Amount', tableX + 5, row3Y + 4);
+    doc.setFont(undefined, 'normal');
+    doc.text(formatCurrency(summary.dailyInterestAmount || 0), tableX + 5, row3Y + 9);
+    
+    // Accrued Interest
+    doc.rect(tableX + colWidth, row3Y, colWidth, rowHeight);
+    doc.setFont(undefined, 'bold');
+    doc.text('Accrued Interest', tableX + colWidth + 5, row3Y + 4);
+    doc.setFont(undefined, 'normal');
+    doc.text(formatCurrency(summary.accruedInterest || 0), tableX + colWidth + 5, row3Y + 9);
+    
+    // Total Payoff Amount
+    doc.rect(tableX + colWidth * 2, row3Y, colWidth, rowHeight);
+    doc.setFont(undefined, 'bold');
+    doc.text('Total Payoff Amount', tableX + colWidth * 2 + 5, row3Y + 4);
+    doc.setFont(undefined, 'normal');
+    doc.text(formatCurrency(summary.totalPayoffAmount || 0), tableX + colWidth * 2 + 5, row3Y + 9);
+    
+    // Payoff Date
+    doc.rect(tableX + colWidth * 3, row3Y, colWidth, rowHeight);
+    doc.setFont(undefined, 'bold');
+    doc.text('Payoff Date', tableX + colWidth * 3 + 5, row3Y + 4);
+    doc.setFont(undefined, 'normal');
+    doc.text(summary.payoffDate || 'Not Specified', tableX + colWidth * 3 + 5, row3Y + 9);
+    
+    return row3Y + rowHeight + 8;
+}
+
+// Add payoff summary section for payoff calculator PDF
+function addPayoffCalculatorPayoffSummary(doc, summary, margin, contentWidth, yPos) {
+    // Get payoff summary data from the webapp
+    const pedDate = document.getElementById('payoffEstimateDate')?.value || '';
+    const payoffDate = document.getElementById('payoffDate')?.value || '';
+    const principalBalance = getNumericValue('principalBalanceOnPED') || 0;
+    const interimPrincipalPaydown = parseFloat(document.getElementById('interimPrincipalPaydown')?.value?.replace(/,/g, '') || 0);
+    const accruedInterest = parseFloat(document.getElementById('accruedInterestAtPayoff')?.value?.replace(/,/g, '') || 0);
+    const finalPaymentDate = document.getElementById('finalPaymentBeforePayoff')?.value || '';
+    
+    const payoffAmount = principalBalance - interimPrincipalPaydown + accruedInterest;
+    
+    // Format dates consistently
+    const dateFormatOptions = { year: 'numeric', month: 'short', day: 'numeric' };
+    
+    const payoffDateObj = new Date(payoffDate + 'T00:00:00');
+    const pedDateObj = new Date(pedDate + 'T00:00:00');
+    
+    const formattedPayoffDate = isNaN(payoffDateObj.getTime()) ? payoffDate : payoffDateObj.toLocaleDateString('en-US', dateFormatOptions);
+    const formattedPEDDate = isNaN(pedDateObj.getTime()) ? pedDate : pedDateObj.toLocaleDateString('en-US', dateFormatOptions);
+    
+    let formattedFinalPaymentDate = 'N/A';
+    if (finalPaymentDate) {
+        const finalPaymentDateObj = new Date(finalPaymentDate + 'T00:00:00');
+        formattedFinalPaymentDate = isNaN(finalPaymentDateObj.getTime()) ? finalPaymentDate : finalPaymentDateObj.toLocaleDateString('en-US', dateFormatOptions);
+    }
+    
+    const tableWidth = contentWidth;
+    const tableX = margin;
+    const rowHeight = 12;
+    
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.5);
+    
+    // Header row
+    const headerY = yPos;
+    doc.rect(tableX, headerY, tableWidth, rowHeight);
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'bold');
+    const headerText = 'Payoff Summary';
+    const headerWidth = doc.getTextWidth(headerText);
+    doc.text(headerText, tableX + (tableWidth - headerWidth) / 2, headerY + 8);
+    
+    // Formula section
+    const formulaY = headerY + rowHeight;
+    const formulaHeight = 18; // Taller for formula text
+    doc.rect(tableX, formulaY, tableWidth, formulaHeight);
+    doc.setFontSize(8);
+    doc.setFont(undefined, 'bold');
+    doc.text('Formula:', tableX + 5, formulaY + 6);
+    doc.setFont(undefined, 'normal');
+    
+    // Split formula text to fit in PDF width
+    const formulaText = `Payoff Amount on ${formattedPayoffDate} = Principal Balance on ${formattedPEDDate} - Principal Paydown (${formattedPEDDate} to ${formattedPayoffDate}) + Accrued Interest (${formattedFinalPaymentDate} to ${formattedPayoffDate})`;
+    
+    // Use text wrapping for long formula
+    const maxWidth = tableWidth - 10; // Account for margins
+    const lines = doc.splitTextToSize(formulaText, maxWidth);
+    let lineY = formulaY + 12;
+    lines.forEach(line => {
+        doc.text(line, tableX + 5, lineY);
+        lineY += 4;
+    });
+    
+    // Calculation section
+    const calcY = formulaY + formulaHeight;
+    const calcHeight = 20; // Height for calculation
+    doc.rect(tableX, calcY, tableWidth, calcHeight);
+    doc.setFont(undefined, 'bold');
+    doc.text('Calculation:', tableX + 5, calcY + 6);
+    doc.setFont(undefined, 'normal');
+    
+    // Main result
+    doc.setFont(undefined, 'bold');
+    doc.text(`Payoff Amount on ${formattedPayoffDate}: ${formatCurrency(payoffAmount)}`, tableX + 5, calcY + 12);
+    
+    // Breakdown calculation
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(7);
+    const breakdownText = `${formatCurrency(principalBalance)} - ${formatCurrency(interimPrincipalPaydown)} + ${formatCurrency(accruedInterest)} = ${formatCurrency(payoffAmount)}`;
+    doc.text(breakdownText, tableX + 5, calcY + 16);
+    
+    return calcY + calcHeight + 8;
+}
+
+function getPayoffCalculatorSummaryData() {
+    if (!currentSchedule || currentSchedule.length === 0) {
+        return {};
+    }
+    
+    // Get payoff details from the schedule
+    const payoffRow = currentSchedule.find(row => row.isPayoffCalculation && row.payoffDetails);
+    const payoffDetails = payoffRow?.payoffDetails;
+    
+    if (!payoffDetails) {
+        return {};
+    }
+    
+    return {
+        currentBalance: getNumericValue('presentBalance'),
+        principalPaydown: payoffDetails.totalPrincipalPaydown || 0,
+        balanceAfterPayments: payoffDetails.presentBalance || 0,
+        payoffDate: payoffRow?.date || 'Not Specified',
+        daysToPayoff: payoffDetails.daysDifference ? `${payoffDetails.daysDifference} days` : 'Not Calculated',
+        dailyInterestAmount: payoffDetails.dailyInterestAmount || 0,
+        accruedInterest: payoffDetails.accruedInterest || 0,
+        totalPayoffAmount: payoffDetails.totalPayoffAmount || 0
+    };
+}

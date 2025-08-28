@@ -1,0 +1,376 @@
+// Payoff Calculator
+
+function createPayoffCalculatorFields() {
+    const fieldsContainer = document.getElementById('inputFields');
+    fieldsContainer.innerHTML = '';
+    
+    // Create input fields similar to standard loan but with modifications for payoff calculator
+    const fields = [
+        createSynchronizedInputElement('loanAmount'),
+        createSynchronizedInputElement('interestRate'),
+        createSynchronizedInputElement('loanTerm'),
+        createPayoffPresentBalanceInputElement(),
+        createSynchronizedInputElement('startDate'),
+        createSynchronizedInputElement('firstPaymentDate'),
+        createPayoffDateInputElement(),
+        createSynchronizedInputElement('paymentDueDay')
+    ];
+    
+    fields.forEach(field => {
+        if (field) {
+            fieldsContainer.appendChild(field);
+            const inputElements = field.querySelectorAll('input, select');
+            inputElements.forEach(inputElement => {
+                if (!inputElement.readOnly && !inputElement.disabled) {
+                    const eventType = inputElement.tagName.toLowerCase() === 'select' ? 'change' : 'input';
+                    inputElement.addEventListener(eventType, calculatePayoffAmount);
+                }
+            });
+        }
+    });
+    
+    // Calculate initial values
+    setTimeout(calculatePayoffAmount, 100);
+}
+
+function createPayoffPresentBalanceInputElement() {
+    return createInputElement('presentBalance', 'number', 'Present Principal Balance ($)', '', '', 0, null, 1);
+}
+
+function createPayoffDateInputElement() {
+    const today = new Date();
+    const futureDate = new Date(today.getTime() + (30 * 24 * 60 * 60 * 1000)); // 30 days from today
+    const defaultPayoffDate = futureDate.toISOString().split('T')[0];
+    
+    return createInputElement('payoffDate', 'date', 'Payoff Date', defaultPayoffDate, '');
+}
+
+function calculatePayoffAmount() {
+    const values = getPayoffCalculatorFormValues();
+    
+    if (!values.presentBalance || !values.interestRate || !values.payoffDate || !values.startDate) {
+        return;
+    }
+    
+    // Calculate the payoff amount with daily interest accrual
+    const payoffDetails = calculateDailyInterestPayoff(
+        values.presentBalance,
+        values.interestRate,
+        values.startDate,
+        values.payoffDate
+    );
+    
+    // Generate a simple schedule showing the payoff calculation
+    const schedule = generatePayoffSchedule(
+        values.presentBalance,
+        values.interestRate,
+        values.loanTerm,
+        values.startDate,
+        values.firstPaymentDate,
+        values.payoffDate,
+        values.paymentDueDay,
+        payoffDetails
+    );
+    
+    currentSchedule = schedule;
+    updatePayoffSummary(schedule);
+    updateChart(schedule);
+    updateScheduleTable(schedule);
+}
+
+function getPayoffCalculatorFormValues() {
+    return {
+        loanAmount: getNumericValue('loanAmount'),
+        presentBalance: getNumericValue('presentBalance'),
+        interestRate: parseFloat(document.getElementById('interestRate')?.value || 0),
+        loanTerm: (() => {
+            const years = parseInt(document.getElementById('loanTermYears')?.value || 0);
+            const months = parseInt(document.getElementById('loanTermMonths')?.value || 0);
+            return years + (months / 12);
+        })(),
+        startDate: document.getElementById('startDate')?.value || new Date().toISOString().split('T')[0],
+        firstPaymentDate: document.getElementById('firstPaymentDate')?.value || (() => {
+            const startDate = document.getElementById('startDate')?.value || new Date().toISOString().split('T')[0];
+            const start = new Date(startDate);
+            const firstPayment = new Date(start.getFullYear(), start.getMonth() + 1, 1);
+            return firstPayment.toISOString().split('T')[0];
+        })(),
+        payoffDate: document.getElementById('payoffDate')?.value || new Date().toISOString().split('T')[0],
+        paymentDueDay: document.getElementById('paymentDueDay')?.value || 'first'
+    };
+}
+
+// Calculate daily interest accrual from today to payoff date
+function calculateDailyInterestPayoff(presentBalance, annualRate, startDate, payoffDate) {
+    // For payoff calculations, we calculate from today to the payoff date, not from original start date
+    const today = new Date();
+    const payoffDateObj = new Date(payoffDate);
+    
+    // Calculate days between today and payoff date
+    const timeDifference = payoffDateObj.getTime() - today.getTime();
+    const daysDifference = Math.max(0, Math.ceil(timeDifference / (1000 * 3600 * 24)));
+    
+    // Calculate daily interest rate
+    const dailyRate = (annualRate / 100) / 365;
+    
+    // Calculate daily interest amount in dollars
+    const dailyInterestAmount = presentBalance * dailyRate;
+    
+    // Calculate accrued interest using simple daily interest (not compounding for payoff calculations)
+    const accruedInterest = dailyInterestAmount * daysDifference;
+    
+    // Total payoff amount
+    const totalPayoffAmount = presentBalance + accruedInterest;
+    
+    return {
+        startDate: startDate,
+        payoffDate: payoffDate,
+        daysDifference: daysDifference,
+        presentBalance: presentBalance,
+        dailyRate: dailyRate,
+        dailyInterestAmount: dailyInterestAmount,
+        accruedInterest: accruedInterest,
+        totalPayoffAmount: totalPayoffAmount,
+        annualRate: annualRate,
+        calculationFromDate: today.toISOString().split('T')[0] // Store when calculation was made from
+    };
+}
+
+function generatePayoffSchedule(originalLoanAmount, annualRate, loanTermYears, startDate, firstPaymentDate, payoffDate, paymentDueDay, payoffDetails) {
+    // Generate the full standard amortization schedule first
+    const fullSchedule = generateStandardAmortizationSchedule(
+        originalLoanAmount,
+        annualRate,
+        loanTermYears,
+        startDate,
+        firstPaymentDate,
+        paymentDueDay,
+        0 // no extra payment for calculating standard balance
+    );
+    
+    // Find today's date to determine current payment position
+    const today = new Date();
+    // Parse payoff date to avoid timezone issues
+    const payoffDateParts = payoffDate.split('-');
+    const payoffDateObj = new Date(parseInt(payoffDateParts[0]), parseInt(payoffDateParts[1]) - 1, parseInt(payoffDateParts[2]));
+    
+    // Find the payment that would be due today or the next payment after today
+    let currentPaymentIndex = 0;
+    for (let i = 0; i < fullSchedule.length; i++) {
+        const paymentDate = new Date(fullSchedule[i].date);
+        if (paymentDate <= today) {
+            currentPaymentIndex = i;
+        } else {
+            break;
+        }
+    }
+    
+    // The present balance should be the balance after the last payment that was due
+    const calculatedPresentBalance = currentPaymentIndex > 0 ? 
+        fullSchedule[currentPaymentIndex].balance : 
+        originalLoanAmount;
+    
+    // Update the present balance field if it's not manually set or is empty
+    const presentBalanceElement = document.getElementById('presentBalance');
+    if (presentBalanceElement && (!presentBalanceElement.value || presentBalanceElement.value.trim() === '')) {
+        presentBalanceElement.value = calculatedPresentBalance.toFixed(2);
+        // Trigger recalculation with the new present balance
+        setTimeout(() => calculatePayoffAmount(), 100);
+        return fullSchedule; // Return early to avoid double calculation
+    }
+    
+    // Use the manually entered present balance as the starting point
+    const currentBalance = payoffDetails.presentBalance;
+    
+    // Calculate the standard monthly payment for this loan (using original 30-year term)
+    const monthlyRate = (annualRate / 100) / 12;
+    const originalTermYears = 30; // Original loan was 30 years
+    const numPayments = originalTermYears * 12;
+    const monthlyPayment = originalLoanAmount * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / (Math.pow(1 + monthlyRate, numPayments) - 1);
+    
+    
+    // Find scheduled payment dates between today and payoff date
+    let scheduledPayments = [];
+    let testDate = new Date(today);
+    testDate.setMonth(testDate.getMonth() + 1); // Start with next month
+    testDate.setDate(1); // Set to 1st day (based on payment due day)
+    
+    console.log('Today:', today.toDateString());
+    console.log('Payoff date:', payoffDateObj.toDateString());
+    
+    while (testDate < payoffDateObj) {
+        scheduledPayments.push(new Date(testDate));
+        console.log('Added scheduled payment:', testDate.toDateString());
+        testDate.setMonth(testDate.getMonth() + 1);
+    }
+    
+    console.log('Total scheduled payments found:', scheduledPayments.length);
+    
+    // Find the corresponding payments in the original schedule for the scheduled payment dates
+    let totalPrincipalPaydown = 0;
+    let lastPaymentDate = today;
+    
+    console.log('Finding scheduled payments in original schedule...');
+    
+    // Debug: Show some sample payments from the original schedule around 2025
+    const samplePayments = fullSchedule.filter(payment => {
+        const paymentDate = new Date(payment.date);
+        return paymentDate.getFullYear() === 2025 && paymentDate.getMonth() >= 7; // Aug 2025 and later
+    }).slice(0, 5);
+    
+    console.log('Sample payments from original schedule (2025):', samplePayments.map(p => ({
+        month: p.month,
+        date: p.date,
+        principal: p.principal,
+        balance: p.balance
+    })));
+    
+    for (const paymentDate of scheduledPayments) {
+        // Find the payment in the original schedule that matches this date
+        const matchingPayment = fullSchedule.find(payment => {
+            const scheduleDate = new Date(payment.date);
+            return scheduleDate.getFullYear() === paymentDate.getFullYear() &&
+                   scheduleDate.getMonth() === paymentDate.getMonth() &&
+                   scheduleDate.getDate() === paymentDate.getDate();
+        });
+        
+        if (matchingPayment) {
+            console.log(`Payment on ${paymentDate.toDateString()}:`, {
+                month: matchingPayment.month,
+                principalPayment: matchingPayment.principal,
+                interestPayment: matchingPayment.interest,
+                balanceAfter: matchingPayment.balance
+            });
+            totalPrincipalPaydown += matchingPayment.principal;
+            lastPaymentDate = paymentDate;
+        } else {
+            console.log(`No matching payment found for ${paymentDate.toDateString()}`);
+        }
+    }
+    
+    console.log('Total principal paydown from schedule:', totalPrincipalPaydown);
+    
+    // Balance after scheduled payments = Present Balance - Total Principal Paydown
+    const balanceAfterPayments = Math.max(0, currentBalance - totalPrincipalPaydown);
+    
+    const balanceAtPayoff = balanceAfterPayments;
+    
+    // Calculate days from last payment to payoff date
+    const daysFromLastPayment = Math.max(0, Math.ceil((payoffDateObj.getTime() - lastPaymentDate.getTime()) / (1000 * 3600 * 24)));
+    
+    // Recalculate payoff details using the correct balance and days
+    const dailyRate = (annualRate / 100) / 365;
+    const dailyInterestAmount = balanceAtPayoff * dailyRate;
+    const accruedInterestFromLastPayment = dailyInterestAmount * daysFromLastPayment;
+    const totalPayoffAmount = balanceAtPayoff + accruedInterestFromLastPayment;
+    
+    // Update payoff details
+    const updatedPayoffDetails = {
+        ...payoffDetails,
+        currentBalance: currentBalance, // Store the actual present balance entered
+        totalPrincipalPaydown: totalPrincipalPaydown, // Total principal from scheduled payments
+        presentBalance: balanceAtPayoff, // Balance after scheduled payments
+        daysDifference: daysFromLastPayment,
+        dailyInterestAmount: dailyInterestAmount,
+        accruedInterest: accruedInterestFromLastPayment,
+        totalPayoffAmount: totalPayoffAmount,
+        lastScheduledPaymentDate: formatDate(lastPaymentDate),
+        scheduledPaymentsMade: scheduledPayments.length
+    };
+    
+    // Add the payoff payment as the final entry
+    const finalPayment = {
+        month: fullSchedule.length + 1,
+        date: formatDate(payoffDateObj),
+        payment: totalPayoffAmount,
+        principal: balanceAtPayoff,
+        interest: accruedInterestFromLastPayment,
+        balance: 0, // Loan is paid off
+        totalInterest: (fullSchedule[fullSchedule.length - 1]?.totalInterest || 0) + accruedInterestFromLastPayment,
+        totalPrincipal: originalLoanAmount,
+        rate: annualRate,
+        isPayoffCalculation: true,
+        payoffDetails: updatedPayoffDetails
+    };
+    
+    fullSchedule.push(finalPayment);
+    
+    return fullSchedule;
+}
+
+// Override updateSummary for payoff calculator to show different information
+function updatePayoffSummary(schedule) {
+    if (!schedule || schedule.length === 0) {
+        document.getElementById('summarySection').style.display = 'none';
+        return;
+    }
+    
+    // Find the payoff calculation row (should be the last one with payoffDetails)
+    const payoffRow = schedule.find(row => row.isPayoffCalculation && row.payoffDetails) || schedule[schedule.length - 1];
+    const payoffDetails = payoffRow?.payoffDetails;
+    
+    if (!payoffDetails) {
+        document.getElementById('summarySection').style.display = 'none';
+        return;
+    }
+    
+    const summaryContent = document.getElementById('summaryContent');
+    
+    // Show information about scheduled payments if any will be made
+    let scheduledPaymentsInfo = '';
+    if (payoffDetails.scheduledPaymentsMade && payoffDetails.scheduledPaymentsMade > 0) {
+        scheduledPaymentsInfo = `
+            <div class="summary-item">
+                <div class="summary-label">Scheduled Payments Before Payoff</div>
+                <div class="summary-value dark">${payoffDetails.scheduledPaymentsMade} payment${payoffDetails.scheduledPaymentsMade > 1 ? 's' : ''}</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-label">Total Principal Paydown</div>
+                <div class="summary-value dark">${formatCurrency(payoffDetails.totalPrincipalPaydown || 0)}</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-label">Last Scheduled Payment Date</div>
+                <div class="summary-value dark">${payoffDetails.lastScheduledPaymentDate}</div>
+            </div>
+        `;
+    }
+    
+    summaryContent.innerHTML = `
+        <div class="summary-item">
+            <div class="summary-label">Current Principal Balance</div>
+            <div class="summary-value primary">${formatCurrency(getNumericValue('presentBalance'))}</div>
+        </div>
+        ${scheduledPaymentsInfo}
+        <div class="summary-item">
+            <div class="summary-label">Balance After Last Scheduled Payment</div>
+            <div class="summary-value primary">${formatCurrency(payoffDetails.presentBalance)}</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-label">Days from Last Payment</div>
+            <div class="summary-value dark">${payoffDetails.daysDifference} days</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-label">Daily Interest Rate</div>
+            <div class="summary-value dark">${(payoffDetails.dailyRate * 100).toFixed(6)}%</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-label">Daily Interest Amount</div>
+            <div class="summary-value dark">${formatCurrency(payoffDetails.dailyInterestAmount)}</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-label">Accrued Interest</div>
+            <div class="summary-value danger">${formatCurrency(payoffDetails.accruedInterest)}</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-label">Total Payoff Amount</div>
+            <div class="summary-value success">${formatCurrency(payoffDetails.totalPayoffAmount)}</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-label">Payoff Date</div>
+            <div class="summary-value dark">${payoffRow.date}</div>
+        </div>
+    `;
+    
+    document.getElementById('summarySection').style.display = 'block';
+}
+

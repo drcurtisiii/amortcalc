@@ -1,0 +1,100 @@
+// Standard Loan Calculator
+
+function createStandardLoanFields() {
+    const fieldsContainer = document.getElementById('inputFields');
+    fieldsContainer.innerHTML = '';
+    
+    // Create synchronized input fields
+    const fields = [
+        createSynchronizedInputElement('loanAmount'),
+        createSynchronizedInputElement('interestRate'),
+        createSynchronizedInputElement('loanTerm'),
+        createSynchronizedInputElement('startDate'),
+        createSynchronizedInputElement('firstPaymentDate'),
+        createSynchronizedInputElement('paymentDueDay'),
+        createSynchronizedInputElement('extraPayment')
+    ];
+    
+    fields.forEach(field => {
+        if (field) {
+            fieldsContainer.appendChild(field);
+            const inputElement = field.querySelector('input') || field.querySelector('select');
+            if (inputElement) {
+                const eventType = inputElement.tagName.toLowerCase() === 'select' ? 'change' : 'input';
+                inputElement.addEventListener(eventType, calculateStandardLoan);
+            }
+        }
+    });
+    
+    // Calculate initial values
+    setTimeout(calculateStandardLoan, 100);
+}
+
+function calculateStandardLoan() {
+    const values = getFormValues();
+    
+    if (!values.loanAmount || !values.interestRate || !values.loanTerm) {
+        return;
+    }
+    
+    const schedule = generateStandardAmortizationSchedule(
+        values.loanAmount,
+        values.interestRate,
+        values.loanTerm * 12,
+        values.startDate,
+        values.firstPaymentDate,
+        values.paymentDueDay,
+        values.extraPayment
+    );
+    
+    currentSchedule = schedule;
+    updateSummary(schedule);
+    updateChart(schedule);
+    updateScheduleTable(schedule);
+}
+
+function generateStandardAmortizationSchedule(principal, annualRate, months, startDate, firstPaymentDate, paymentDueDay, extraPayment = 0) {
+    const schedule = [];
+    let balance = principal;
+    const monthlyRate = annualRate / 100 / 12;
+    let currentDate = new Date(firstPaymentDate);
+    const startDateDay = new Date(startDate).getDate();
+    let totalInterest = 0;
+    let totalPrincipal = 0;
+    
+    // Calculate base monthly payment
+    const basePayment = calculateMonthlyPayment(principal, annualRate, months);
+    
+    for (let month = 1; month <= months && balance > 0; month++) {
+        const interestPayment = balance * monthlyRate;
+        let principalPayment = Math.min(basePayment - interestPayment + extraPayment, balance);
+        
+        const totalPayment = interestPayment + principalPayment;
+        balance -= principalPayment;
+        
+        totalInterest += interestPayment;
+        totalPrincipal += principalPayment;
+        
+        schedule.push({
+            month,
+            date: formatDate(currentDate),
+            payment: totalPayment,
+            principal: principalPayment,
+            interest: interestPayment,
+            balance: Math.max(0, balance),
+            totalInterest,
+            totalPrincipal,
+            rate: annualRate
+        });
+        
+        // Calculate next payment date based on payment due day setting
+        if (month < months && balance > 0) {
+            // For subsequent payments, use month-1 as offset since we start from firstPaymentDate
+            currentDate = calculatePaymentDate(startDate, month, paymentDueDay, startDateDay, firstPaymentDate);
+        }
+        
+        if (balance <= 0) break;
+    }
+    
+    return schedule;
+}

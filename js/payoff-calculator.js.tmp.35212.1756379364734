@@ -1,0 +1,308 @@
+// Payoff Calculator (cloned from Standard Loan)
+
+function createPayoffCalculatorFields() {
+    const fieldsContainer = document.getElementById('inputFields');
+    fieldsContainer.innerHTML = '';
+    
+    // Create synchronized input fields
+    const fields = [
+        createSynchronizedInputElement('loanAmount'),
+        createSynchronizedInputElement('interestRate'),
+        createSynchronizedInputElement('loanTerm'),
+        createSynchronizedInputElement('startDate'),
+        createSynchronizedInputElement('firstPaymentDate'),
+        createSynchronizedInputElement('paymentDueDay'),
+        createSynchronizedInputElement('extraPayment')
+    ];
+    
+    fields.forEach(field => {
+        if (field) {
+            fieldsContainer.appendChild(field);
+            const inputElement = field.querySelector('input') || field.querySelector('select');
+            if (inputElement) {
+                const eventType = inputElement.tagName.toLowerCase() === 'select' ? 'change' : 'input';
+                inputElement.addEventListener(eventType, calculatePayoffCalculator);
+            }
+        }
+    });
+    
+    // Calculate initial values
+    setTimeout(calculatePayoffCalculator, 100);
+}
+
+function calculatePayoffCalculator() {
+    const values = getFormValues();
+    
+    if (!values.loanAmount || !values.interestRate || !values.loanTerm) {
+        return;
+    }
+    
+    const schedule = generatePayoffCalculatorAmortizationSchedule(
+        values.loanAmount,
+        values.interestRate,
+        values.loanTerm * 12,
+        values.startDate,
+        values.firstPaymentDate,
+        values.paymentDueDay,
+        values.extraPayment
+    );
+    
+    currentSchedule = schedule;
+    updateSummary(schedule);
+    updateChart(schedule);
+    updateScheduleTable(schedule);
+}
+
+function generatePayoffCalculatorAmortizationSchedule(principal, annualRate, months, startDate, firstPaymentDate, paymentDueDay, extraPayment = 0) {
+    const schedule = [];
+    let balance = principal;
+    const monthlyRate = annualRate / 100 / 12;
+    
+    // Parse first payment date to avoid timezone issues
+    const firstDateParts = firstPaymentDate.split('-');
+    let currentDate = new Date(parseInt(firstDateParts[0]), parseInt(firstDateParts[1]) - 1, parseInt(firstDateParts[2]));
+    
+    const startDateDay = new Date(startDate).getDate();
+    let totalInterest = 0;
+    let totalPrincipal = 0;
+    
+    // Calculate base monthly payment
+    const basePayment = calculateMonthlyPayment(principal, annualRate, months);
+    
+    for (let month = 1; month <= months && balance > 0; month++) {
+        const interestPayment = balance * monthlyRate;
+        let principalPayment = Math.min(basePayment - interestPayment + extraPayment, balance);
+        
+        const totalPayment = interestPayment + principalPayment;
+        balance -= principalPayment;
+        
+        totalInterest += interestPayment;
+        totalPrincipal += principalPayment;
+        
+        schedule.push({
+            month,
+            date: formatDate(currentDate),
+            payment: totalPayment,
+            principal: principalPayment,
+            interest: interestPayment,
+            balance: Math.max(0, balance),
+            totalInterest,
+            totalPrincipal,
+            rate: annualRate
+        });
+        
+        // Calculate next payment date based on payment due day setting
+        if (month < months && balance > 0) {
+            // Use the same parsed first date to avoid timezone issues
+            let nextDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
+            
+            // Set the day based on payment due day setting
+            let dayOfMonth;
+            switch (paymentDueDay) {
+                case 'first':
+                    dayOfMonth = 1;
+                    break;
+                case 'fifth':
+                    dayOfMonth = 5;
+                    break;
+                case 'tenth':
+                    dayOfMonth = 10;
+                    break;
+                case 'fifteenth':
+                    dayOfMonth = 15;
+                    break;
+                case 'same':
+                default:
+                    dayOfMonth = currentDate.getDate();
+                    break;
+            }
+            
+            // Ensure the day doesn't exceed the month's days
+            const daysInMonth = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 0).getDate();
+            dayOfMonth = Math.min(dayOfMonth, daysInMonth);
+            
+            nextDate.setDate(dayOfMonth);
+            currentDate = nextDate;
+        }
+        
+        if (balance <= 0) break;
+    }
+    
+    return schedule;
+}
+
+// PDF Generation functionality for Payoff Calculator
+async function generatePayoffCalculatorPDF() {
+    try {
+        const pdfBlob = await createPayoffCalculatorPDFDocument();
+        if (pdfBlob) {
+            const pdfUrl = URL.createObjectURL(pdfBlob);
+            window.open(pdfUrl, '_blank');
+        }
+    } catch (error) {
+        console.error('Error generating PDF:', error);
+        alert('Error generating PDF. Please try again.');
+    }
+}
+
+async function createPayoffCalculatorPDFDocument() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // Page dimensions - 0.5" margins
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 18; // 0.25 inches (0.25 * 72 = 18 points)
+    const contentWidth = pageWidth - (margin * 2);
+    
+    // Get data
+    const caseName = document.getElementById('caseName').value;
+    const borrowerName = caseName; // Use caseName as borrower name for footer
+    const summary = getPayoffCalculatorSummaryData();
+    const chartImage = await captureChartAsImage();
+    
+    // PAGE 1: Summary Page
+    let yPos = margin + 15;
+    
+    // Title: "Payoff Calculator" (centered)
+    doc.setFontSize(20);
+    doc.setFont(undefined, 'bold');
+    const title = 'Payoff Calculator';
+    const titleWidth = doc.getTextWidth(title);
+    doc.text(title, (pageWidth - titleWidth) / 2, yPos);
+    yPos += 10;
+
+    // Case name (centered, if provided)
+    if (caseName) {
+        doc.setFontSize(16);
+        doc.setFont(undefined, 'normal');
+        const caseWidth = doc.getTextWidth(caseName);
+        doc.text(caseName, (pageWidth - caseWidth) / 2, yPos);
+        yPos += 10;
+    }
+    
+    // Loan Summary Table
+    yPos = addPayoffCalculatorSummaryTable(doc, summary, margin, contentWidth, yPos);
+    
+    // Chart image
+    if (chartImage) {
+        yPos = addChartImage(doc, chartImage, margin, contentWidth, yPos, borrowerName);
+    }
+    
+    // Add footer to page 1
+    addFooter(doc, 1, pageWidth, pageHeight, margin, null, borrowerName);
+    
+    // PAGE 2+: Amortization Schedule
+    doc.addPage();
+    addAmortizationSchedule(doc, margin, contentWidth, pageWidth, pageHeight, borrowerName);
+    
+    return doc.output('blob');
+}
+
+function addPayoffCalculatorSummaryTable(doc, summary, margin, contentWidth, yPos) {
+    // Table title
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    const tableTitle = 'Loan Summary (Payoff Calculator)';
+    const tableTitleWidth = doc.getTextWidth(tableTitle);
+    doc.text(tableTitle, (doc.internal.pageSize.getWidth() - tableTitleWidth) / 2, yPos);
+    yPos += 8;
+    
+    // Table data
+    const borrowerName = document.getElementById('caseName').value || 'Not Specified';
+    
+    // Get loan start date from the startDate input field
+    const startDateElement = document.getElementById('startDate');
+    let loanStartDate = 'Not Specified';
+    if (startDateElement && startDateElement.value) {
+        const startDate = new Date(startDateElement.value);
+        loanStartDate = formatDate(startDate);
+    }
+    
+    // Get first payment date from the schedule (if available) or calculate from start date
+    let firstPaymentDate = 'Not Specified';
+    if (currentSchedule && currentSchedule.length > 0) {
+        firstPaymentDate = currentSchedule[0].date;
+    } else if (startDateElement && startDateElement.value) {
+        const startDate = new Date(startDateElement.value);
+        startDate.setMonth(startDate.getMonth() + 1);
+        firstPaymentDate = formatDate(startDate);
+    }
+    
+    // Get payment due day setting
+    const paymentDueDayElement = document.getElementById('paymentDueDay');
+    let paymentDueDay = 'Not Specified';
+    if (paymentDueDayElement && paymentDueDayElement.value) {
+        const selectedOption = paymentDueDayElement.options[paymentDueDayElement.selectedIndex];
+        paymentDueDay = selectedOption ? selectedOption.text : paymentDueDayElement.value;
+    }
+    
+    const tableData = [
+        ['Borrower(s):', borrowerName],
+        ['Loan Start Date:', loanStartDate],
+        ['First Payment Date:', firstPaymentDate],
+        ['Payment Due Day:', paymentDueDay],
+        ['Loan Type:', 'Payoff Calculator'],
+        ['Current Balance:', formatCurrency(summary.currentBalance || 0)],
+        ['Principal Paydown:', formatCurrency(summary.principalPaydown || 0)],
+        ['Balance After Last Payment:', formatCurrency(summary.balanceAfterPayments || 0)],
+        ['Payoff Date:', summary.payoffDate || 'Not Specified'],
+        ['Days from Last Payment:', summary.daysToPayoff || 'Not Calculated'],
+        ['Daily Interest Amount:', formatCurrency(summary.dailyInterestAmount || 0)],
+        ['Accrued Interest:', formatCurrency(summary.accruedInterest || 0)],
+        ['Total Payoff Amount:', formatCurrency(summary.totalPayoffAmount || 0)]
+    ];
+    
+    // Table dimensions
+    const tableWidth = contentWidth;
+    const tableX = margin;
+    const colWidth = tableWidth / 2;
+    const rowHeight = 6;
+    
+    doc.setFontSize(8);
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.5);
+    
+    // Draw table
+    tableData.forEach((row, index) => {
+        const rowY = yPos + (index * rowHeight);
+        
+        // Draw row border
+        doc.rect(tableX, rowY, tableWidth, rowHeight);
+        doc.line(tableX + colWidth, rowY, tableX + colWidth, rowY + rowHeight);
+        
+        // Add text - centered vertically in cell
+        const textYCenter = rowY + (rowHeight / 2) + 2;
+        doc.setFont(undefined, 'bold');
+        doc.text(row[0], tableX + 5, textYCenter);
+        doc.setFont(undefined, 'normal');
+        doc.text(row[1], tableX + colWidth + 5, textYCenter);
+    });
+    
+    return yPos + (tableData.length * rowHeight) + 8;
+}
+
+function getPayoffCalculatorSummaryData() {
+    if (!currentSchedule || currentSchedule.length === 0) {
+        return {};
+    }
+    
+    // Get payoff details from the schedule
+    const payoffRow = currentSchedule.find(row => row.isPayoffCalculation && row.payoffDetails);
+    const payoffDetails = payoffRow?.payoffDetails;
+    
+    if (!payoffDetails) {
+        return {};
+    }
+    
+    return {
+        currentBalance: getNumericValue('presentBalance'),
+        principalPaydown: payoffDetails.totalPrincipalPaydown || 0,
+        balanceAfterPayments: payoffDetails.presentBalance || 0,
+        payoffDate: payoffRow?.date || 'Not Specified',
+        daysToPayoff: payoffDetails.daysDifference ? `${payoffDetails.daysDifference} days` : 'Not Calculated',
+        dailyInterestAmount: payoffDetails.dailyInterestAmount || 0,
+        accruedInterest: payoffDetails.accruedInterest || 0,
+        totalPayoffAmount: payoffDetails.totalPayoffAmount || 0
+    };
+}

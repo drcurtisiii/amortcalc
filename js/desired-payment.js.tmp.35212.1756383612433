@@ -1,0 +1,210 @@
+// Desired Payment Loan Calculator
+
+function createDesiredPaymentLoanFields() {
+    // Create common fields container (loan term will show as "Calculated Loan Term")
+    createCommonFieldsContainer('desired-payment');
+    
+    // Create tab-specific fields container
+    const tabContainer = document.getElementById('tabSpecificFieldsContainer');
+    tabContainer.innerHTML = '';
+    
+    // Desired payment specific fields
+    const desiredPaymentField = createDesiredPaymentInputElement();
+    const extraPaymentField = createSynchronizedInputElement('extraPayment');
+    
+    if (desiredPaymentField) {
+        tabContainer.appendChild(desiredPaymentField);
+        const inputElement = desiredPaymentField.querySelector('input');
+        if (inputElement) {
+            inputElement.addEventListener('input', calculateDesiredPaymentLoan);
+        }
+    }
+    
+    if (extraPaymentField) {
+        tabContainer.appendChild(extraPaymentField);
+        const inputElement = extraPaymentField.querySelector('input');
+        if (inputElement) {
+            inputElement.addEventListener('input', calculateDesiredPaymentLoan);
+        }
+    }
+    
+    // Add event listeners to common fields
+    addCommonFieldEventListeners(calculateDesiredPaymentLoan);
+    
+    // Calculate initial values
+    setTimeout(calculateDesiredPaymentLoan, 100);
+}
+
+function createDesiredPaymentInputElement() {
+    return createInputElement('desiredPayment', 'number', 'Desired Monthly Payment ($)', 1500, '', 0, null, 1);
+}
+
+
+function calculateDesiredPaymentLoan() {
+    const values = getDesiredPaymentFormValues();
+    
+    if (!values.loanAmount || !values.interestRate || !values.desiredPayment) {
+        return;
+    }
+    
+    // Calculate loan term in months based on desired payment
+    const calculatedTermMonths = calculateLoanTermFromPayment(
+        values.loanAmount,
+        values.interestRate,
+        values.desiredPayment
+    );
+    
+    // Update the calculated term display
+    const years = Math.floor(calculatedTermMonths / 12);
+    const months = Math.round(calculatedTermMonths % 12);
+    
+    document.getElementById('loanTermYears').value = years;
+    document.getElementById('loanTermMonths').value = months;
+    
+    // Generate amortization schedule using the calculated term
+    const schedule = generateDesiredPaymentAmortizationSchedule(
+        values.loanAmount,
+        values.interestRate,
+        calculatedTermMonths,
+        values.startDate,
+        values.firstPaymentDate,
+        values.paymentDueDay,
+        values.desiredPayment,
+        values.extraPayment
+    );
+    
+    currentSchedule = schedule;
+    updateSummary(schedule);
+    updateChart(schedule);
+    updateScheduleTable(schedule);
+}
+
+function getDesiredPaymentFormValues() {
+    return {
+        loanAmount: getNumericValue('loanAmount'),
+        interestRate: parseFloat(document.getElementById('interestRate')?.value || 0),
+        desiredPayment: getNumericValue('desiredPayment'),
+        startDate: document.getElementById('startDate')?.value || new Date().toISOString().split('T')[0],
+        firstPaymentDate: document.getElementById('firstPaymentDate')?.value || (() => {
+            const startDate = document.getElementById('startDate')?.value || new Date().toISOString().split('T')[0];
+            const start = new Date(startDate);
+            const firstPayment = new Date(start.getFullYear(), start.getMonth() + 1, 1);
+            return firstPayment.toISOString().split('T')[0];
+        })(),
+        paymentDueDay: document.getElementById('paymentDueDay')?.value || 'first',
+        extraPayment: getNumericValue('extraPayment')
+    };
+}
+
+// Calculate loan term in months based on desired payment (reverse calculation)
+function calculateLoanTermFromPayment(principal, annualRate, desiredPayment) {
+    if (annualRate === 0) {
+        // If no interest, just divide principal by payment
+        return principal / desiredPayment;
+    }
+    
+    const monthlyRate = annualRate / 100 / 12;
+    
+    // Check if desired payment is sufficient
+    const interestOnlyPayment = principal * monthlyRate;
+    if (desiredPayment <= interestOnlyPayment) {
+        // Payment is too low - would take infinite time
+        return 999; // Return maximum term as indicator
+    }
+    
+    // Use logarithmic formula to calculate number of payments
+    // n = -log(1 - (P * r) / PMT) / log(1 + r)
+    // Where P = principal, r = monthly rate, PMT = payment, n = number of payments
+    
+    const numerator = Math.log(1 - (principal * monthlyRate) / desiredPayment);
+    const denominator = Math.log(1 + monthlyRate);
+    const months = -numerator / denominator;
+    
+    return Math.max(1, Math.min(999, months)); // Clamp between 1 and 999 months
+}
+
+function generateDesiredPaymentAmortizationSchedule(principal, annualRate, calculatedTermMonths, startDate, firstPaymentDate, paymentDueDay, desiredPayment, extraPayment = 0) {
+    const schedule = [];
+    let balance = principal;
+    const monthlyRate = annualRate / 100 / 12;
+    
+    // Parse first payment date to avoid timezone issues
+    const firstDateParts = firstPaymentDate.split('-');
+    let currentDate = new Date(parseInt(firstDateParts[0]), parseInt(firstDateParts[1]) - 1, parseInt(firstDateParts[2]));
+    
+    const startDateDay = new Date(startDate).getDate();
+    let totalInterest = 0;
+    let totalPrincipal = 0;
+    
+    const maxMonths = Math.ceil(calculatedTermMonths);
+    
+    for (let month = 1; month <= maxMonths && balance > 0; month++) {
+        const interestPayment = balance * monthlyRate;
+        
+        // For desired payment loans, use the desired payment amount
+        let totalPayment = desiredPayment + extraPayment;
+        
+        // On the last payment, only pay what's needed to clear the balance
+        if (month === maxMonths || totalPayment >= balance + interestPayment) {
+            totalPayment = balance + interestPayment;
+        }
+        
+        let principalPayment = totalPayment - interestPayment;
+        principalPayment = Math.min(principalPayment, balance); // Don't overpay principal
+        
+        balance -= principalPayment;
+        
+        totalInterest += interestPayment;
+        totalPrincipal += principalPayment;
+        
+        schedule.push({
+            month,
+            date: formatDate(currentDate),
+            payment: totalPayment,
+            principal: principalPayment,
+            interest: interestPayment,
+            balance: Math.max(0, balance),
+            totalInterest,
+            totalPrincipal,
+            rate: annualRate
+        });
+        
+        // Calculate next payment date based on payment due day setting
+        if (month < maxMonths && balance > 0) {
+            // Use the same parsed first date to avoid timezone issues
+            let nextDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
+            
+            // Set the day based on payment due day setting
+            let dayOfMonth;
+            switch (paymentDueDay) {
+                case 'first':
+                    dayOfMonth = 1;
+                    break;
+                case 'fifth':
+                    dayOfMonth = 5;
+                    break;
+                case 'tenth':
+                    dayOfMonth = 10;
+                    break;
+                case 'fifteenth':
+                    dayOfMonth = 15;
+                    break;
+                case 'same':
+                default:
+                    dayOfMonth = currentDate.getDate();
+                    break;
+            }
+            
+            // Ensure the day doesn't exceed the month's days
+            const daysInMonth = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 0).getDate();
+            dayOfMonth = Math.min(dayOfMonth, daysInMonth);
+            
+            nextDate.setDate(dayOfMonth);
+            currentDate = nextDate;
+        }
+        
+        if (balance <= 0) break;
+    }
+    
+    return schedule;
+}

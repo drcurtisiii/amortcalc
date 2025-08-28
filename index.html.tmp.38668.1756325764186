@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amortization Calculator</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+    <!-- Sticky Header -->
+    <div class="header-container">
+        <div class="header-content">
+            <!-- Left Cell: Title and Action Buttons -->
+            <div class="header-left">
+                <h1 class="title">
+                    <img src="CLF-SHIELD-BRASS-FINAL.png" alt="CLF Logo" class="title-icon"> Amortization Calculator
+                </h1>
+                <div class="action-buttons">
+                    <button id="printBtn" class="btn btn-primary">Print PDF</button>
+                    <button id="saveBtn" class="btn btn-success">Save</button>
+                    <label for="loadFile" class="btn btn-purple">
+                        Load
+                        <input type="file" id="loadFile" accept=".json,.zip" style="display: none;">
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Right Cell: Loan Type and Buttons -->
+            <div class="header-right">
+                <label class="header-label">Loan Type</label>
+                <div class="loan-type-buttons">
+                    <button class="loan-type-btn active" data-type="standard">Standard</button>
+                    <button class="loan-type-btn" data-type="recasting">Recasting</button>
+                    <button class="loan-type-btn" data-type="balloon">Balloon</button>
+                    <button class="loan-type-btn" data-type="arm">Adjustable Rate</button>
+                    <button class="loan-type-btn" data-type="desired-payment">Desired Payment</button>
+                    <button class="loan-type-btn" data-type="payoff-calculator">Payoff Calculator</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="calculator-card">
+            <!-- Combined Input Container for 4x2 Grid -->
+            <div class="combined-input-container">
+                <!-- Borrower(s) Input - Fixed position A1+B1 -->
+                <div class="input-group borrower-input">
+                    <label for="caseName">Borrower(s)</label>
+                    <input type="text" id="caseName" placeholder="">
+                </div>
+                
+                <!-- Dynamic Input Fields Container -->
+                <div id="inputFields" class="input-fields">
+                    <!-- Fields will be dynamically loaded based on loan type -->
+                </div>
+            </div>
+            
+            <!-- Summary Section -->
+            <div id="summarySection" class="summary-section" style="display: none;">
+                <h2>Loan Summary</h2>
+                <div id="summaryContent" class="summary-grid">
+                    <!-- Summary will be populated dynamically -->
+                </div>
+            </div>
+            
+            <!-- Chart Section -->
+            <div id="chartSection" class="chart-section" style="display: none;">
+                <h2>Payment Breakdown Over Time</h2>
+                <div class="chart-container">
+                    <canvas id="paymentChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- Amortization Schedule Table -->
+            <div id="scheduleSection" class="schedule-section">
+                <h2>Amortization Schedule</h2>
+                <div class="table-container">
+                    <table id="scheduleTable" class="schedule-table">
+                        <thead>
+                            <tr>
+                                <th>Month</th>
+                                <th>Date</th>
+                                <th class="text-right">Payment</th>
+                                <th class="text-right">Principal</th>
+                                <th class="text-right">Interest</th>
+                                <th class="text-right">Balance</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scheduleBody">
+                            <!-- Table rows will be populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/utils.js"></script>
+    <script src="js/field-sync.js"></script>
+    <script src="js/rate-fetching.js"></script>
+    <script src="js/standard-loan.js"></script>
+    <script src="js/recasting-loan.js"></script>
+    <script src="js/balloon-loan.js"></script>
+    <script src="js/arm-loan.js"></script>
+    <script src="js/desired-payment.js"></script>
+    <script src="js/payoff-calculator.js"></script>
+    <script src="js/chart-handler.js"></script>
+    <script src="js/pdf-generator.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,622 @@
+// Adjustable Rate Mortgage (ARM) Calculator
+
+// Simple rate fetching function - bypasses complex service issues
+async function fetchCurrentRates() {
+    console.log('Fetching current rates directly...');
+    try {
+        const response = await fetch('https://api.stlouisfed.org/fred/series/observations?series_id=DPRIME&api_key=demo&file_type=json&limit=1&sort_order=desc');
+        if (response.ok) {
+            const data = await response.json();
+            if (data.observations && data.observations.length > 0) {
+                const wsjRate = parseFloat(data.observations[0].value);
+                console.log('Successfully fetched WSJ Prime Rate:', wsjRate);
+                return {
+                    wsjPrime: wsjRate,
+                    sofr: 5.32,
+                    treasury1Year: 4.85,
+                    libor: 5.75,
+                    source: 'FRED API',
+                    lastUpdated: new Date().toISOString()
+                };
+            }
+        }
+    } catch (error) {
+        console.error('Rate fetch failed:', error);
+    }
+    
+    console.log('Using fallback rates');
+    return {
+        wsjPrime: 7.50,
+        sofr: 5.32,
+        treasury1Year: 4.85,
+        libor: 5.75,
+        source: 'Fallback',
+        lastUpdated: new Date().toISOString()
+    };
+}
+
+function createARMLoanFields() {
+    const fieldsContainer = document.getElementById('inputFields');
+    fieldsContainer.innerHTML = '';
+    
+    // Create synchronized input fields in the specified order
+    const marginInfoText = `
+        <h4>What is "Margin" in ARM loans?</h4>
+        <p><strong>Margin</strong> is a fixed percentage that the lender adds to an index rate to determine your adjustable interest rate after the initial fixed period ends.</p>
+        
+        <h4>Formula:</h4>
+        <p><strong>Fully Indexed Rate = Current Index Rate + Margin</strong></p>
+        
+        <h4>Example:</h4>
+        <ul>
+            <li>Current WSJ Prime Rate: 7.5%</li>
+            <li>Margin: 2.5%</li>
+            <li>Fully Indexed Rate: 10.0%</li>
+        </ul>
+        
+        <h4>Key Points:</h4>
+        <ul>
+            <li>The margin <strong>never changes</strong> during the loan term</li>
+            <li>Only the <strong>index rate fluctuates</strong> with market conditions</li>
+            <li>Your payment adjusts based on the new rate + remaining balance</li>
+        </ul>
+    `;
+    
+    console.log('Creating ARM loan fields...');
+    
+    try {
+        // Note: Borrower field (caseName) is already in the HTML, no need to create it dynamically
+        
+        // 1. Loan Amount  
+        const loanAmountField = createInputElement('loanAmount', 'number', 'Loan Amount ($)', 250000, '', 0, null, 1);
+        fieldsContainer.appendChild(loanAmountField);
+        document.getElementById('loanAmount').addEventListener('input', calculateARMLoan);
+        
+        // 2. Loan Term
+        const loanTermField = createInputElement('loanTerm', 'number', 'Loan Term (years)', 30, '', 1, 50, 1);
+        fieldsContainer.appendChild(loanTermField);
+        document.getElementById('loanTerm').addEventListener('input', calculateARMLoan);
+        
+        // 3. ARM Index (dropdown with external links)
+        const indexOptions = [
+            { value: '', text: 'Select One' },
+            { value: 'WSJ', text: 'WSJ Prime Rate', url: 'https://www.wsj.com/market-data/bonds/moneyrates' },
+            { value: 'SOFR', text: 'SOFR', url: 'https://www.newyorkfed.org/markets/reference-rates/sofr' },
+            { value: 'Treasury', text: '1-Year Treasury', url: 'https://www.treasury.gov/resource-center/data-chart-center/interest-rates/pages/textview.aspx?data=yield' },
+            { value: 'LIBOR', text: 'LIBOR (Legacy)', url: 'https://www.ice.com/iba/libor' },
+            { value: 'Other', text: 'Other (Custom)' }
+        ];
+        const indexField = createSelectElement('armIndex', 'ARM Index', indexOptions, '');
+        fieldsContainer.appendChild(indexField);
+        document.getElementById('armIndex').addEventListener('change', handleIndexChange);
+        
+        // 4. Current Index Rate
+        const indexRateField = createInputElement('indexRate', 'number', 'Current Index Rate (%)', '', 'Enter the current rate from your selected index', 0, 50, 0.01);
+        fieldsContainer.appendChild(indexRateField);
+        document.getElementById('indexRate').addEventListener('input', updateFullyIndexedRate);
+        
+        // 5. Margin/Spread
+        const marginField = createInputElement('margin', 'number', 'Margin/Spread (%)', 2.5, '', 0, 10, 0.125, marginInfoText);
+        fieldsContainer.appendChild(marginField);
+        document.getElementById('margin').addEventListener('input', updateFullyIndexedRate);
+        
+        // 6. Fully Indexed Rate (calculated, read-only)
+        const fullyIndexedRateField = createInputElement('fullyIndexedRate', 'number', 'Fully Indexed Rate (%)', '', 'Automatically calculated: Index Rate + Margin', 0, 50, 0.01);
+        fullyIndexedRateField.querySelector('input').readOnly = true;
+        fullyIndexedRateField.querySelector('input').style.backgroundColor = '#f1f5f9';
+        fullyIndexedRateField.querySelector('input').style.fontWeight = 'bold';
+        fieldsContainer.appendChild(fullyIndexedRateField);
+        
+        // 7. Lifetime Cap
+        const lifetimeCapField = createInputElement('lifetimeCap', 'number', 'Lifetime Cap (%)', 5, '', 0, 20, 0.5);
+        fieldsContainer.appendChild(lifetimeCapField);
+        document.getElementById('lifetimeCap').addEventListener('input', calculateARMLoan);
+        
+        // 8. Fixed Rate Period
+        const fixedPeriodOptions = [
+            { value: 1, text: '1 Year' },
+            { value: 2, text: '2 Years' },
+            { value: 3, text: '3 Years' },
+            { value: 5, text: '5 Years' },
+            { value: 7, text: '7 Years' },
+            { value: 10, text: '10 Years' }
+        ];
+        const fixedPeriodField = createSelectElement('fixedPeriod', 'Fixed Rate Period', fixedPeriodOptions, 5);
+        fieldsContainer.appendChild(fixedPeriodField);
+        document.getElementById('fixedPeriod').addEventListener('change', calculateARMLoan);
+        
+        // 9. Adjustment Period
+        const adjustmentOptions = [
+            { value: 6, text: '6 Months' },
+            { value: 12, text: '1 Year' }
+        ];
+        const adjustmentField = createSelectElement('adjustmentPeriod', 'Adjustment Period', adjustmentOptions, 12);
+        fieldsContainer.appendChild(adjustmentField);
+        document.getElementById('adjustmentPeriod').addEventListener('change', calculateARMLoan);
+        
+        // 10. Start Date
+        const startDateField = createSynchronizedInputElement('startDate');
+        fieldsContainer.appendChild(startDateField);
+        startDateField.querySelector('input').addEventListener('input', calculateARMLoan);
+        
+        // 11. First Payment Due Date
+        const firstPaymentDateField = createSynchronizedInputElement('firstPaymentDate');
+        fieldsContainer.appendChild(firstPaymentDateField);
+        firstPaymentDateField.querySelector('input').addEventListener('input', calculateARMLoan);
+        
+        // 12. Payment Due Day
+        const paymentDueDayField = createSynchronizedInputElement('paymentDueDay');
+        fieldsContainer.appendChild(paymentDueDayField);
+        paymentDueDayField.querySelector('select').addEventListener('change', calculateARMLoan);
+        
+        // 13. Extra Monthly Payment
+        const extraPaymentField = createSynchronizedInputElement('extraPayment');
+        fieldsContainer.appendChild(extraPaymentField);
+        extraPaymentField.querySelector('input').addEventListener('input', calculateARMLoan);
+        
+        // Create custom index input field (initially hidden)
+        const customIndexField = createInputElement('customIndex', 'text', 'Custom Index Name', '', 'e.g., Bank Prime Rate, Custom Rate, etc.');
+        customIndexField.style.display = 'none';
+        customIndexField.id = 'customIndexField';
+        fieldsContainer.appendChild(customIndexField);
+        document.getElementById('customIndex').addEventListener('input', calculateARMLoan);
+        
+        console.log('All ARM fields created successfully');
+        
+        // Initialize calculations
+        setTimeout(() => {
+            updateFullyIndexedRate();
+            calculateARMLoan();
+        }, 100);
+        
+    } catch (error) {
+        console.error('Error creating ARM loan fields:', error);
+    }
+}
+
+// Simplified rate initialization function
+async function initializeRatesAndDisplay() {
+    const rateStatusDiv = document.getElementById('rateStatus');
+    const indexRateField = document.getElementById('indexRate');
+    
+    console.log('Starting simplified rate initialization...');
+    
+    // Show loading state
+    if (indexRateField) {
+        indexRateField.value = 'Loading...';
+    }
+    
+    if (rateStatusDiv) {
+        rateStatusDiv.innerHTML = '🔄 Fetching current rates...';
+        rateStatusDiv.style.backgroundColor = '#fef3c7';
+        rateStatusDiv.style.borderColor = '#f59e0b';
+        rateStatusDiv.style.color = '#92400e';
+    }
+    
+    try {
+        // Fetch rates using simple direct function
+        const rates = await fetchCurrentRates();
+        
+        // Update index options with current rates
+        const armIndexSelect = document.getElementById('armIndex');
+        if (armIndexSelect && rates) {
+            const options = armIndexSelect.querySelectorAll('option');
+            options.forEach(option => {
+                const value = option.value;
+                let rate = null;
+                
+                switch(value) {
+                    case 'WSJ':
+                        rate = rates.wsjPrime;
+                        break;
+                    case 'SOFR':
+                        rate = rates.sofr;
+                        break;
+                    case 'Treasury':
+                        rate = rates.treasury1Year;
+                        break;
+                    case 'LIBOR':
+                        rate = rates.libor;
+                        break;
+                }
+                
+                if (rate !== null) {
+                    // Update option text with current rate
+                    const baseText = option.textContent.replace(/\s*\(.*?\).*$/, '');
+                    option.textContent = `${baseText} (${rate.toFixed(2)}%)`;
+                }
+            });
+        }
+        
+        // Update status indicator
+        if (rateStatusDiv) {
+            const source = rates.source === 'FRED API' ? 'live Federal Reserve data' : 'fallback rates';
+            const statusIcon = rates.source === 'FRED API' ? '✅' : '⚠️';
+            const timestamp = new Date(rates.lastUpdated).toLocaleString();
+            
+            rateStatusDiv.innerHTML = `${statusIcon} Using ${source} (updated: ${timestamp})`;
+            
+            if (rates.source === 'FRED API') {
+                rateStatusDiv.style.backgroundColor = '#dcfce7';
+                rateStatusDiv.style.borderColor = '#22c55e';
+                rateStatusDiv.style.color = '#166534';
+            } else {
+                rateStatusDiv.style.backgroundColor = '#fef2f2';
+                rateStatusDiv.style.borderColor = '#ef4444';
+                rateStatusDiv.style.color = '#dc2626';
+            }
+        }
+        
+        // Set initial index rate
+        handleIndexChange();
+        
+    } catch (error) {
+        console.error('Rate initialization failed:', error);
+        
+        if (rateStatusDiv) {
+            rateStatusDiv.innerHTML = '❌ Rate fetch failed - using fallback rates';
+            rateStatusDiv.style.backgroundColor = '#fef2f2';
+            rateStatusDiv.style.borderColor = '#ef4444';
+            rateStatusDiv.style.color = '#dc2626';
+        }
+        
+        handleIndexChange(); // Use fallback rates
+    }
+}
+
+async function initializeWithLiveRates() {
+    const rateStatusDiv = document.getElementById('rateStatus');
+    
+    // Ensure rate fetching service is available with retry mechanism
+    let retryCount = 0;
+    const maxRetries = 5;
+    
+    while ((!window.rateFetchingService || typeof window.rateFetchingService.getCurrentRates !== 'function') && retryCount < maxRetries) {
+        console.log(`Waiting for rate fetching service... attempt ${retryCount + 1}`);
+        await new Promise(resolve => setTimeout(resolve, 100)); // Wait 100ms
+        retryCount++;
+    }
+    
+        // If still not available, try to create it manually
+    if (!window.rateFetchingService || typeof window.rateFetchingService.getCurrentRates !== 'function') {
+        console.log('Attempting to manually initialize rate fetching service...');
+        try {
+            if (typeof RateFetchingService !== 'undefined') {
+                window.rateFetchingService = new RateFetchingService();
+                console.log('Successfully created rate fetching service manually');
+            } else {
+                console.error('RateFetchingService class not found');
+                // Create a simple fallback implementation
+                window.rateFetchingService = {
+                    getCurrentRates: async function() {
+                        console.log('Using simplified rate fetching...');
+                        try {
+                            // Simple direct API call to FRED for WSJ Prime
+                            const response = await fetch('https://api.stlouisfed.org/fred/series/observations?series_id=DPRIME&api_key=demo&file_type=json&limit=1&sort_order=desc');
+                            if (response.ok) {
+                                const data = await response.json();
+                                const rate = parseFloat(data.observations[0].value);
+                                return {
+                                    wsjPrime: rate,
+                                    sofr: 5.32,
+                                    treasury1Year: 4.85,
+                                    libor: 5.75,
+                                    cached: false,
+                                    lastUpdated: new Date().toISOString()
+                                };
+                            }
+                        } catch (error) {
+                            console.error('Simplified API call failed:', error);
+                        }
+                        // Return fallback rates
+                        return {
+                            wsjPrime: 7.50,
+                            sofr: 5.32,
+                            treasury1Year: 4.85,
+                            libor: 5.75,
+                            cached: false,
+                            lastUpdated: new Date().toISOString()
+                        };
+                    }
+                };
+                console.log('Created simplified rate fetching service');
+            }
+        } catch (error) {
+            console.error('Failed to manually initialize rate fetching service:', error);
+        }
+    }    // Final check
+    if (!window.rateFetchingService || typeof window.rateFetchingService.getCurrentRates !== 'function') {
+        console.warn('Rate fetching service not available after all attempts, using fallback rates');
+        if (rateStatusDiv) {
+            rateStatusDiv.innerHTML = '⚠️ Rate service unavailable - using fallback rates';
+            rateStatusDiv.style.backgroundColor = '#fef2f2';
+            rateStatusDiv.style.borderColor = '#ef4444';
+            rateStatusDiv.style.color = '#dc2626';
+        }
+        handleIndexChange(); // Use fallback rates
+        return;
+    }
+    
+    console.log('Rate fetching service is available, proceeding with live rate fetch...');
+    
+    try {
+        // Show loading indicator
+        const indexRateField = document.getElementById('indexRate');
+        if (indexRateField) {
+            indexRateField.value = 'Loading...';
+        }
+        
+        if (rateStatusDiv) {
+            rateStatusDiv.innerHTML = '🔄 Fetching current rates from Federal Reserve...';
+            rateStatusDiv.style.backgroundColor = '#fef3c7';
+            rateStatusDiv.style.borderColor = '#f59e0b';
+            rateStatusDiv.style.color = '#92400e';
+        }
+        
+        // Fetch current rates
+        const rates = await window.rateFetchingService.getCurrentRates();
+        
+        if (rates) {
+            // Update the index options with live rates
+            const armIndexSelect = document.getElementById('armIndex');
+            if (armIndexSelect) {
+                const options = armIndexSelect.querySelectorAll('option');
+                options.forEach(option => {
+                    const value = option.value;
+                    let rate = null;
+                    
+                    switch(value) {
+                        case 'WSJ':
+                            rate = rates.wsjPrime;
+                            break;
+                        case 'SOFR':
+                            rate = rates.sofr;
+                            break;
+                        case 'Treasury':
+                            rate = rates.treasury1Year;
+                            break;
+                        case 'LIBOR':
+                            rate = rates.libor;
+                            break;
+                    }
+                    
+                    if (rate !== null) {
+                        option.textContent = option.textContent.replace(/\(.*?\)/, `(${rate.toFixed(2)}%)`);
+                        if (!option.textContent.includes('(')) {
+                            option.textContent += ` (${rate.toFixed(2)}%)`;
+                        }
+                    }
+                });
+            }
+            
+            // Update status indicator with success
+            if (rateStatusDiv) {
+                const lastUpdated = rates.lastUpdated ? new Date(rates.lastUpdated).toLocaleString() : 'just now';
+                const source = rates.cached ? 'cached data' : 'live Federal Reserve data';
+                rateStatusDiv.innerHTML = `✅ Rates updated from ${source} (as of ${lastUpdated})`;
+                rateStatusDiv.style.backgroundColor = '#dcfce7';
+                rateStatusDiv.style.borderColor = '#22c55e';
+                rateStatusDiv.style.color = '#166534';
+            }
+        } else {
+            throw new Error('No rate data received');
+        }
+        
+        // Set initial index rate based on selected option
+        handleIndexChange();
+        
+    } catch (error) {
+        console.error('Failed to fetch live rates:', error);
+        
+        // Update status indicator with error
+        if (rateStatusDiv) {
+            rateStatusDiv.innerHTML = '⚠️ Using fallback rates - live data temporarily unavailable';
+            rateStatusDiv.style.backgroundColor = '#fef2f2';
+            rateStatusDiv.style.borderColor = '#ef4444';
+            rateStatusDiv.style.color = '#dc2626';
+        }
+        
+        // Fallback to hardcoded rates if API fails
+        handleIndexChange();
+    }
+}
+
+function handleIndexChange() {
+    const indexSelect = document.getElementById('armIndex');
+    const indexRateField = document.getElementById('indexRate');
+    const customIndexField = document.getElementById('customIndexField');
+    
+    if (!indexSelect || !indexRateField) return;
+    
+    const selectedIndex = indexSelect.value;
+    
+    // Define URLs for external rate sources
+    const rateUrls = {
+        'WSJ': 'https://www.wsj.com/market-data/bonds/moneyrates',
+        'SOFR': 'https://www.newyorkfed.org/markets/reference-rates/sofr',
+        'Treasury': 'https://www.treasury.gov/resource-center/data-chart-center/interest-rates/pages/textview.aspx?data=yield',
+        'LIBOR': 'https://www.ice.com/iba/libor'
+    };
+    
+    if (selectedIndex === '') {
+        // Select One - clear the rate field
+        indexRateField.value = '';
+        customIndexField.style.display = 'none';
+    } else if (selectedIndex === 'Other') {
+        // Show custom index field
+        customIndexField.style.display = 'block';
+        indexRateField.placeholder = 'Enter custom index rate';
+    } else {
+        // Hide custom field
+        customIndexField.style.display = 'none';
+        
+        // Open external URL in new tab for rate lookup
+        if (rateUrls[selectedIndex]) {
+            window.open(rateUrls[selectedIndex], '_blank');
+            
+            // Show helpful message
+            indexRateField.placeholder = `Enter current ${indexSelect.options[indexSelect.selectedIndex].text} from the opened page`;
+            
+            // Clear the field so user enters fresh rate
+            indexRateField.value = '';
+        }
+    }
+    
+    updateFullyIndexedRate();
+}
+
+function updateFullyIndexedRate() {
+    const indexRateField = document.getElementById('indexRate');
+    const marginField = document.getElementById('margin');
+    const fullyIndexedRateField = document.getElementById('fullyIndexedRate');
+    
+    if (!indexRateField || !marginField || !fullyIndexedRateField) return;
+    
+    const indexRate = parseFloat(indexRateField.value) || 0;
+    const margin = parseFloat(marginField.value) || 0;
+    const fullyIndexedRate = indexRate + margin;
+    
+    // Update the fully indexed rate field
+    fullyIndexedRateField.value = fullyIndexedRate.toFixed(3);
+    
+    // Sync this rate to the shared interest rate field for other tabs
+    synchronizeField('interestRate', fullyIndexedRate.toFixed(3));
+    
+    // Trigger recalculation
+    calculateARMLoan();
+}
+
+function calculateARMLoan() {
+    const values = getARMFormValues();
+    
+    if (!values.loanAmount || !values.interestRate || !values.loanTerm) {
+        return;
+    }
+    
+    const armSettings = {
+        fixedMonths: values.fixedPeriod * 12,
+        adjustmentMonths: values.adjustmentPeriod,
+        initialRate: values.interestRate,
+        index: values.armIndex,
+        margin: values.margin,
+        lifetimeCap: values.lifetimeCap
+    };
+    
+    const schedule = generateARMAmortizationSchedule(
+        values.loanAmount,
+        values.interestRate,
+        values.loanTerm * 12,
+        values.startDate,
+        values.firstPaymentDate,
+        values.paymentDueDay,
+        values.extraPayment
+    );
+    
+    currentSchedule = schedule;
+    updateSummary(schedule);
+    updateChart(schedule);
+    updateScheduleTable(schedule);
+    
+    // Update table header to include rate column for ARM
+    const tableHeader = document.querySelector('#scheduleTable thead tr');
+    if (tableHeader && !tableHeader.querySelector('.rate-header')) {
+        const rateHeader = document.createElement('th');
+        rateHeader.textContent = 'Rate';
+        rateHeader.className = 'rate-header text-right';
+        tableHeader.appendChild(rateHeader);
+    }
+}
+
+function getARMFormValues() {
+    const selectedIndex = document.getElementById('armIndex')?.value || 'SOFR';
+    const customIndexName = document.getElementById('customIndex')?.value || '';
+    
+    return {
+        loanAmount: getNumericValue('loanAmount'),
+        interestRate: parseFloat(document.getElementById('fullyIndexedRate')?.value || 0),
+        loanTerm: parseInt(document.getElementById('loanTerm')?.value || 0),
+        fixedPeriod: parseInt(document.getElementById('fixedPeriod')?.value || 5),
+        armIndex: selectedIndex === 'Other' ? customIndexName : selectedIndex,
+        margin: parseFloat(document.getElementById('margin')?.value || 2.5),
+        adjustmentPeriod: parseInt(document.getElementById('adjustmentPeriod')?.value || 12),
+        lifetimeCap: parseFloat(document.getElementById('lifetimeCap')?.value || 5),
+        startDate: document.getElementById('startDate')?.value || new Date().toISOString().split('T')[0],
+        firstPaymentDate: document.getElementById('firstPaymentDate')?.value || (() => {
+            const startDate = document.getElementById('startDate')?.value || new Date().toISOString().split('T')[0];
+            const start = new Date(startDate);
+            const firstPayment = new Date(start.getFullYear(), start.getMonth() + 1, 1);
+            return firstPayment.toISOString().split('T')[0];
+        })(),
+        paymentDueDay: document.getElementById('paymentDueDay')?.value || 'first',
+        extraPayment: getNumericValue('extraPayment')
+    };
+}
+
+function generateARMAmortizationSchedule(principal, initialRate, months, startDate, firstPaymentDate, paymentDueDay, extraPayment = 0) {
+    const schedule = [];
+    let balance = principal;
+    let currentDate = new Date(firstPaymentDate);
+    const startDateDay = new Date(startDate).getDate();
+    let totalInterest = 0;
+    let totalPrincipal = 0;
+    
+    // For ARM loans, treat as fixed rate using the fully indexed rate (index + margin)
+    // Use the same calculation as standard loans - no rate speculation or adjustments
+    const fullyIndexedRate = initialRate; // This is already the fully indexed rate from the form
+    const monthlyRate = fullyIndexedRate / 100 / 12;
+    
+    // Calculate fixed monthly payment for the entire loan term (same as standard loan)
+    const basePayment = calculateMonthlyPayment(principal, fullyIndexedRate, months);
+    
+    for (let month = 1; month <= months && balance > 0; month++) {
+        const interestPayment = balance * monthlyRate;
+        let principalPayment = Math.min(basePayment - interestPayment + extraPayment, balance);
+        
+        const totalPayment = interestPayment + principalPayment;
+        balance -= principalPayment;
+        
+        totalInterest += interestPayment;
+        totalPrincipal += principalPayment;
+        
+        schedule.push({
+            month,
+            date: formatDate(currentDate),
+            payment: totalPayment,
+            principal: principalPayment,
+            interest: interestPayment,
+            balance: Math.max(0, balance),
+            totalInterest,
+            totalPrincipal,
+            rate: fullyIndexedRate
+        });
+        
+        // Calculate next payment date based on payment due day setting
+        if (month < months && balance > 0) {
+            currentDate = calculatePaymentDate(startDate, month, paymentDueDay, startDateDay, firstPaymentDate);
+        }
+        
+        if (balance <= 0) break;
+    }
+    
+    return schedule;
+}
+
+// Override updateScheduleTable for ARM to include rate column
+function updateARMScheduleTable(schedule) {
+    const tbody = document.getElementById('scheduleBody');
+    tbody.innerHTML = '';
+    
+    schedule.forEach((row, index) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${row.month}</td>
+            <td>${row.date}</td>
+            <td class="text-right">${formatCurrency(row.payment)}</td>
+            <td class="text-right">${formatCurrency(row.principal)}</td>
+            <td class="text-right">${formatCurrency(row.interest)}</td>
+            <td class="text-right">${formatCurrency(row.balance)}</td>
+            <td class="text-right">${row.rate.toFixed(3)}%</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}

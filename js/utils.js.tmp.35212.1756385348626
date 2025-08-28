@@ -1,0 +1,548 @@
+// Utility functions for the amortization calculator
+
+// Format currency
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    }).format(amount);
+}
+
+// Format date
+function formatDate(date) {
+    // Handle date string parsing to avoid timezone issues
+    let dateObj;
+    if (typeof date === 'string') {
+        // Parse date string as local time to avoid UTC conversion issues
+        const parts = date.split('-');
+        if (parts.length === 3) {
+            dateObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        } else {
+            dateObj = new Date(date);
+        }
+    } else {
+        dateObj = new Date(date);
+    }
+    
+    return dateObj.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+    });
+}
+
+// Calculate monthly payment
+function calculateMonthlyPayment(principal, rate, months) {
+    if (rate === 0) return principal / months;
+    const monthlyRate = rate / 100 / 12;
+    return (principal * monthlyRate * Math.pow(1 + monthlyRate, months)) / 
+           (Math.pow(1 + monthlyRate, months) - 1);
+}
+
+// Calculate payment date based on payment due day setting
+function calculatePaymentDate(startDate, monthOffset, paymentDueDay, startDateDay = null, firstPaymentDate = null) {
+    // Use first payment date as the base for calculations instead of start date
+    const baseDate = firstPaymentDate ? new Date(firstPaymentDate) : new Date(startDate);
+    
+    if (startDateDay === null) {
+        startDateDay = new Date(startDate).getDate();
+    }
+    
+    // For 'same' option, use first payment date day instead of start date day
+    let referenceDay = startDateDay;
+    if (paymentDueDay === 'same' && firstPaymentDate) {
+        referenceDay = new Date(firstPaymentDate).getDate();
+    }
+    
+    // Calculate the target month and year based on first payment date + monthOffset
+    const targetDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + monthOffset, 1);
+    
+    let dayOfMonth;
+    switch (paymentDueDay) {
+        case 'first':
+            dayOfMonth = 1;
+            break;
+        case 'fifth':
+            dayOfMonth = 5;
+            break;
+        case 'tenth':
+            dayOfMonth = 10;
+            break;
+        case 'fifteenth':
+            dayOfMonth = 15;
+            break;
+        case 'same':
+        default:
+            dayOfMonth = referenceDay;
+            break;
+    }
+    
+    // Set the target day, ensuring it doesn't exceed the month's days
+    const daysInMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0).getDate();
+    dayOfMonth = Math.min(dayOfMonth, daysInMonth);
+    
+    targetDate.setDate(dayOfMonth);
+    return targetDate;
+}
+
+// Get form values
+function getFormValues() {
+    return {
+        caseName: document.getElementById('caseName').value,
+        loanAmount: getNumericValue('loanAmount'),
+        interestRate: parseFloat(document.getElementById('interestRate')?.value || 0),
+        loanTerm: (() => {
+            const years = parseInt(document.getElementById('loanTermYears')?.value || 0);
+            const months = parseInt(document.getElementById('loanTermMonths')?.value || 0);
+            return years + (months / 12);
+        })(),
+        startDate: document.getElementById('startDate')?.value || new Date().toISOString().split('T')[0],
+        firstPaymentDate: document.getElementById('firstPaymentDate')?.value || (() => {
+            const startDate = document.getElementById('startDate')?.value || new Date().toISOString().split('T')[0];
+            const start = new Date(startDate);
+            const firstPayment = new Date(start.getFullYear(), start.getMonth() + 1, 1);
+            return firstPayment.toISOString().split('T')[0];
+        })(),
+        paymentDueDay: document.getElementById('paymentDueDay')?.value || 'first',
+        extraPayment: getNumericValue('extraPayment')
+    };
+}
+
+// Create input element
+function createInputElement(id, type, label, value, placeholder = '', min = null, max = null, step = null, infoText = null) {
+    const div = document.createElement('div');
+    div.className = 'input-group';
+    
+    const labelContainer = document.createElement('div');
+    labelContainer.className = 'label-container';
+    
+    const labelEl = document.createElement('label');
+    labelEl.setAttribute('for', id);
+    labelEl.textContent = label;
+    labelContainer.appendChild(labelEl);
+    
+    // Add info icon if infoText is provided
+    if (infoText) {
+        const infoIcon = document.createElement('img');
+        infoIcon.src = 'BLUEI.png';
+        infoIcon.className = 'info-icon';
+        infoIcon.alt = 'Information';
+        infoIcon.title = 'Click for information';
+        infoIcon.addEventListener('click', () => showInfoPopup(label, infoText));
+        labelContainer.appendChild(infoIcon);
+    }
+    
+    const input = document.createElement('input');
+    input.id = id;
+    
+    // Format currency inputs with commas and use text type - but exclude date fields
+    if ((id.includes('Amount') || id.includes('Balance') || id.includes('lumpSum') || id.includes('Payment') || id.includes('Fee')) && type !== 'date') {
+        input.type = 'text';
+        input.value = formatNumberWithCommas(value);
+        input.addEventListener('input', formatCurrencyInput);
+        input.addEventListener('blur', formatCurrencyInput);
+        input.addEventListener('keypress', allowOnlyNumbers);
+    } else {
+        input.type = type;
+        input.value = value;
+        if (min !== null) input.min = min;
+        if (max !== null) input.max = max;
+        if (step !== null) input.step = step;
+    }
+    
+    if (placeholder) input.placeholder = placeholder;
+    
+    div.appendChild(labelContainer);
+    div.appendChild(input);
+    
+    return div;
+}
+
+// Format number with commas
+function formatNumberWithCommas(value) {
+    if (!value) return '';
+    return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+// Handle currency input formatting
+function formatCurrencyInput(e) {
+    let value = e.target.value.replace(/[^0-9.]/g, ''); // Remove everything except numbers and decimal
+    if (!isNaN(value) && value !== '') {
+        // Ensure only one decimal point
+        const parts = value.split('.');
+        if (parts.length > 2) {
+            value = parts[0] + '.' + parts.slice(1).join('');
+        }
+        // Limit to 2 decimal places
+        if (parts[1] && parts[1].length > 2) {
+            value = parts[0] + '.' + parts[1].substring(0, 2);
+        }
+        e.target.value = formatNumberWithCommas(value);
+    } else if (value === '') {
+        e.target.value = '';
+    }
+}
+
+// Allow only numbers, decimal point, and backspace
+function allowOnlyNumbers(e) {
+    const char = String.fromCharCode(e.which);
+    if (!/[0-9.]/.test(char) && e.which !== 8 && e.which !== 46) {
+        e.preventDefault();
+    }
+    
+    // Prevent multiple decimal points
+    if (char === '.' && e.target.value.indexOf('.') !== -1) {
+        e.preventDefault();
+    }
+}
+
+// Get numeric value from formatted input
+function getNumericValue(elementId) {
+    const element = document.getElementById(elementId);
+    if (!element) return 0;
+    return parseFloat(element.value.replace(/,/g, '')) || 0;
+}
+
+// Create dual number input element (e.g., years and months)
+function createDualNumberInputElement(fieldDef, label) {
+    const div = document.createElement('div');
+    div.className = 'input-group';
+    
+    const labelEl = document.createElement('label');
+    labelEl.textContent = label;
+    
+    const inputContainer = document.createElement('div');
+    inputContainer.className = 'dual-input-container';
+    inputContainer.style.display = 'flex';
+    inputContainer.style.gap = '8px';
+    
+    // Create inputs for each part
+    fieldDef.parts.forEach((part, index) => {
+        const partContainer = document.createElement('div');
+        partContainer.style.flex = '1';
+        partContainer.style.display = 'flex';
+        partContainer.style.flexDirection = 'column';
+        partContainer.style.alignItems = 'center';
+        
+        const input = document.createElement('input');
+        input.id = part.id;
+        input.type = 'number';
+        input.min = part.min;
+        input.max = part.max;
+        input.step = part.step;
+        input.value = window.sharedFieldValues[part.id] || part.defaultValue || 0;
+        input.style.width = '100%';
+        input.style.textAlign = 'center';
+        
+        const partLabel = document.createElement('label');
+        partLabel.textContent = part.label;
+        partLabel.style.fontSize = '0.8em';
+        partLabel.style.marginTop = '4px';
+        partLabel.style.textAlign = 'center';
+        
+        partContainer.appendChild(input);
+        partContainer.appendChild(partLabel);
+        inputContainer.appendChild(partContainer);
+        
+        // Add synchronization listener
+        input.addEventListener('input', function() {
+            synchronizeField(part.id, this.value);
+            // Also update the combined loanTerm value
+            updateCombinedLoanTerm();
+        });
+    });
+    
+    div.appendChild(labelEl);
+    div.appendChild(inputContainer);
+    
+    return div;
+}
+
+// Update combined loan term value when years or months change
+function updateCombinedLoanTerm() {
+    const years = parseFloat(window.sharedFieldValues.loanTermYears || 0);
+    const months = parseFloat(window.sharedFieldValues.loanTermMonths || 0);
+    const totalYears = years + (months / 12);
+    window.sharedFieldValues.loanTerm = totalYears;
+    
+    // Trigger loan recalculation if needed
+    if (typeof calculateCurrentLoanType === 'function') {
+        calculateCurrentLoanType();
+    }
+}
+
+// Create select element
+function createSelectElement(id, label, options, selectedValue) {
+    const div = document.createElement('div');
+    div.className = 'input-group';
+    
+    const labelEl = document.createElement('label');
+    labelEl.setAttribute('for', id);
+    labelEl.textContent = label;
+    
+    const select = document.createElement('select');
+    select.id = id;
+    
+    options.forEach(option => {
+        const optionEl = document.createElement('option');
+        optionEl.value = option.value;
+        optionEl.textContent = option.text;
+        if (option.currentRate !== undefined) {
+            optionEl.setAttribute('data-rate', option.currentRate);
+        }
+        if (option.value === selectedValue) {
+            optionEl.selected = true;
+        }
+        select.appendChild(optionEl);
+    });
+    
+    div.appendChild(labelEl);
+    div.appendChild(select);
+    
+    return div;
+}
+
+// Create checkbox element
+function createCheckboxElement(id, label, checked = false) {
+    const div = document.createElement('div');
+    div.className = 'checkbox-group';
+    
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.id = id;
+    input.checked = checked;
+    
+    const labelEl = document.createElement('label');
+    labelEl.setAttribute('for', id);
+    labelEl.textContent = label;
+    
+    div.appendChild(input);
+    div.appendChild(labelEl);
+    
+    return div;
+}
+
+// Create checkbox element with separate heading (like input-group style)
+function createCheckboxWithHeadingElement(id, heading, checkboxLabel, checked = false) {
+    const div = document.createElement('div');
+    div.className = 'input-group';
+    
+    // Create heading label (not associated with checkbox)
+    const headingEl = document.createElement('label');
+    headingEl.textContent = heading;
+    headingEl.className = 'field-heading';
+    
+    // Create checkbox container
+    const checkboxContainer = document.createElement('div');
+    checkboxContainer.className = 'checkbox-container';
+    
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.id = id;
+    input.checked = checked;
+    
+    const labelEl = document.createElement('label');
+    labelEl.setAttribute('for', id);
+    labelEl.textContent = checkboxLabel;
+    labelEl.className = 'checkbox-label';
+    
+    checkboxContainer.appendChild(input);
+    checkboxContainer.appendChild(labelEl);
+    
+    div.appendChild(headingEl);
+    div.appendChild(checkboxContainer);
+    
+    return div;
+}
+
+// Helper function to get ordinal suffix for day numbers
+function getDayOrdinalSuffix(day) {
+    if (day >= 11 && day <= 13) {
+        return 'th';
+    }
+    switch (day % 10) {
+        case 1: return 'st';
+        case 2: return 'nd';
+        case 3: return 'rd';
+        default: return 'th';
+    }
+}
+
+// Update summary display
+function updateSummary(schedule) {
+    if (!schedule || schedule.length === 0) {
+        document.getElementById('summarySection').style.display = 'none';
+        return;
+    }
+    
+    const lastRow = schedule[schedule.length - 1];
+    const monthlyPayment = schedule[0].payment;
+    const totalPayments = schedule.reduce((sum, row) => sum + row.payment, 0);
+    const finalPaymentAmount = lastRow.payment; // Get the actual last payment from amort table
+    
+    // Get payment due day text
+    const paymentDueDay = document.getElementById('paymentDueDay')?.value || 'first';
+    let paymentDueDayText;
+    
+    if (paymentDueDay === 'same') {
+        // Extract day from first payment date and format it
+        const firstPaymentDate = new Date(schedule[0].date);
+        const dayOfMonth = firstPaymentDate.getDate();
+        const suffix = getDayOrdinalSuffix(dayOfMonth);
+        paymentDueDayText = `${dayOfMonth}${suffix} of each month`;
+    } else {
+        paymentDueDayText = {
+            'first': '1st of each month',
+            'fifth': '5th of each month',  
+            'tenth': '10th of each month',
+            'fifteenth': '15th of each month'
+        }[paymentDueDay] || '1st of each month';
+    }
+    
+    const summary = {
+        monthlyPayment,
+        totalPayments,
+        totalInterest: lastRow.totalInterest,
+        totalPrincipal: lastRow.totalPrincipal,
+        firstPaymentDate: schedule[0].date,
+        paymentDueDay: paymentDueDayText,
+        payoffDate: lastRow.date,
+        finalPaymentAmount
+    };
+    
+    const summaryContent = document.getElementById('summaryContent');
+    summaryContent.innerHTML = `
+        <div class="summary-item">
+            <div class="summary-label">Monthly Payment</div>
+            <div class="summary-value primary">${formatCurrency(summary.monthlyPayment)}</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-label">Total Payments</div>
+            <div class="summary-value dark">${formatCurrency(summary.totalPayments)}</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-label">Total Interest</div>
+            <div class="summary-value danger">${formatCurrency(summary.totalInterest)}</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-label">Total Principal</div>
+            <div class="summary-value success">${formatCurrency(summary.totalPrincipal)}</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-label">First Payment Date</div>
+            <div class="summary-value dark">${summary.firstPaymentDate}</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-label">Payment Due Day</div>
+            <div class="summary-value dark">${summary.paymentDueDay}</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-label">Payoff Date</div>
+            <div class="summary-value dark">${summary.payoffDate}</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-label">Final Payoff Amount</div>
+            <div class="summary-value primary">${formatCurrency(summary.finalPaymentAmount)}</div>
+        </div>
+    `;
+    
+    document.getElementById('summarySection').style.display = 'block';
+}
+
+// Update schedule table
+function updateScheduleTable(schedule) {
+    const tbody = document.getElementById('scheduleBody');
+    tbody.innerHTML = '';
+    
+    schedule.forEach((row, index) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${row.month}</td>
+            <td>${row.date}</td>
+            <td class="text-right">${formatCurrency(row.payment)}</td>
+            <td class="text-right">${formatCurrency(row.principal)}</td>
+            <td class="text-right">${formatCurrency(row.interest)}</td>
+            <td class="text-right">${formatCurrency(row.balance)}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+
+// Download file
+function downloadFile(content, filename, type) {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// Global state
+let currentSchedule = [];
+let currentLoanType = 'standard';
+
+// Show info popup
+function showInfoPopup(title, content) {
+    // Remove existing popup if any
+    const existingPopup = document.getElementById('infoPopup');
+    if (existingPopup) {
+        existingPopup.remove();
+    }
+    
+    // Create popup overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'infoPopup';
+    overlay.className = 'info-popup-overlay';
+    
+    // Create popup content
+    const popup = document.createElement('div');
+    popup.className = 'info-popup';
+    
+    const header = document.createElement('div');
+    header.className = 'info-popup-header';
+    header.innerHTML = `
+        <h3>${title}</h3>
+        <button class="info-popup-close" onclick="closeInfoPopup()">&times;</button>
+    `;
+    
+    const body = document.createElement('div');
+    body.className = 'info-popup-body';
+    body.innerHTML = content;
+    
+    popup.appendChild(header);
+    popup.appendChild(body);
+    overlay.appendChild(popup);
+    
+    // Add to document
+    document.body.appendChild(overlay);
+    
+    // Close on overlay click
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+            closeInfoPopup();
+        }
+    });
+    
+    // Close on Escape key
+    document.addEventListener('keydown', function escapeHandler(e) {
+        if (e.key === 'Escape') {
+            closeInfoPopup();
+            document.removeEventListener('keydown', escapeHandler);
+        }
+    });
+}
+
+// Close info popup
+function closeInfoPopup() {
+    const popup = document.getElementById('infoPopup');
+    if (popup) {
+        popup.remove();
+    }
+}

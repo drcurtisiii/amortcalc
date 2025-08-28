@@ -1,0 +1,307 @@
+// Payoff Calculator - New Structure
+
+function createPayoffCalculatorFields() {
+    // Create common fields container (this feeds the regular amortization table)
+    createCommonFieldsContainer('payoff-calculator');
+    
+    // Create tab-specific fields container for payoff-specific calculations
+    const tabContainer = document.getElementById('tabSpecificFieldsContainer');
+    tabContainer.innerHTML = '';
+    
+    // Create payoff-specific fields in 4x2 grid
+    const payoffFields = createPayoffCalculatorSpecificFields();
+    payoffFields.forEach(field => {
+        if (field) {
+            tabContainer.appendChild(field);
+        }
+    });
+    
+    // Add event listeners to common fields (for regular amortization)
+    addCommonFieldEventListeners(calculatePayoffCalculator);
+    
+    // Add event listeners to payoff-specific fields
+    addPayoffFieldEventListeners();
+    
+    // Calculate initial values
+    setTimeout(calculatePayoffCalculator, 100);
+}
+
+function createPayoffCalculatorSpecificFields() {
+    // Row 1: PED, Principal Balance on PED, Payoff Date, Regular Payments Until Payoff
+    const pedField = createInputElement('payoffEstimateDate', 'date', 'Payoff Estimate Date (PED)', getTodayDate());
+    const principalBalanceField = createInputElement('principalBalanceOnPED', 'currency', 'Principal Balance on PED ($)', 0, '', 0, null, 1);
+    const payoffDateField = createInputElement('payoffDate', 'date', 'Payoff Date', getDefaultPayoffDate());
+    const regularPaymentsField = createInputElement('regularPaymentsUntilPayoff', 'number', 'Regular Payments Until Payoff', 0, '', 0, null, 1);
+    
+    // Row 2: Final Payment Before Payoff, Interim Principal Paydown, Daily Interest Amount, Accrued Interest at Payoff
+    const finalPaymentField = createInputElement('finalPaymentBeforePayoff', 'date', 'Final Payment Before Payoff', '', 'Auto-calculated', null, null, null, true);
+    const interimPrincipalField = createInputElement('interimPrincipalPaydown', 'currency', 'Interim Principal Paydown ($)', 0, 'Auto-calculated', 0, null, 1, true);
+    const dailyInterestField = createInputElement('dailyInterestAmount', 'currency', 'Daily Interest Amount ($)', 0, 'Auto-calculated', 0, null, 0.01, true);
+    const accruedInterestField = createInputElement('accruedInterestAtPayoff', 'currency', 'Accrued Interest at Payoff ($)', 0, 'Auto-calculated', 0, null, 1, true);
+    
+    // Make read-only fields visually distinct
+    [regularPaymentsField, finalPaymentField, interimPrincipalField, dailyInterestField, accruedInterestField].forEach(field => {
+        if (field) {
+            const input = field.querySelector('input');
+            if (input) {
+                input.readOnly = true;
+                input.style.backgroundColor = '#f1f5f9';
+                input.style.fontWeight = 'bold';
+                input.style.cursor = 'not-allowed';
+            }
+        }
+    });
+    
+    return [
+        pedField,
+        principalBalanceField, 
+        payoffDateField,
+        regularPaymentsField,
+        finalPaymentField,
+        interimPrincipalField,
+        dailyInterestField,
+        accruedInterestField
+    ];
+}
+
+function addPayoffFieldEventListeners() {
+    // Add listeners to user-configurable payoff fields
+    ['payoffEstimateDate', 'principalBalanceOnPED', 'payoffDate'].forEach(fieldId => {
+        const element = document.getElementById(fieldId);
+        if (element) {
+            element.addEventListener('input', calculatePayoffScenario);
+            element.addEventListener('change', calculatePayoffScenario);
+        }
+    });
+}
+
+function calculatePayoffCalculator() {
+    // First, calculate the regular amortization schedule (feeds the main table)
+    const values = getFormValues();
+    
+    if (!values.loanAmount || !values.interestRate || !values.loanTerm) {
+        return;
+    }
+    
+    // Generate standard amortization schedule (this populates the main table)
+    const schedule = generateStandardAmortizationSchedule(
+        values.loanAmount,
+        values.interestRate,
+        values.loanTerm * 12,
+        values.startDate,
+        values.firstPaymentDate,
+        values.paymentDueDay,
+        0 // No extra payments in base schedule
+    );
+    
+    currentSchedule = schedule;
+    
+    // Update the main displays with regular schedule
+    updateSummary(schedule);
+    updateChart(schedule);
+    updateScheduleTable(schedule);
+    
+    // Set default principal balance based on PED if not already set
+    updateDefaultPrincipalBalance();
+    
+    // Calculate payoff scenario
+    calculatePayoffScenario();
+}
+
+function calculatePayoffScenario() {
+    const schedule = currentSchedule;
+    if (!schedule || schedule.length === 0) {
+        return;
+    }
+    
+    const pedDate = document.getElementById('payoffEstimateDate')?.value;
+    const payoffDate = document.getElementById('payoffDate')?.value;
+    const principalBalance = getNumericValue('principalBalanceOnPED');
+    
+    if (!pedDate || !payoffDate || !principalBalance) {
+        return;
+    }
+    
+    const pedDateObj = new Date(pedDate);
+    const payoffDateObj = new Date(payoffDate);
+    
+    if (payoffDateObj <= pedDateObj) {
+        return; // Payoff date must be after PED
+    }
+    
+    // Calculate regular payments between PED and payoff date
+    const regularPayments = getRegularPaymentsBetweenDates(schedule, pedDateObj, payoffDateObj);
+    
+    // Calculate final payment before payoff
+    const finalPaymentDate = getFinalPaymentBeforeDate(schedule, payoffDateObj);
+    
+    // Calculate interim principal paydown
+    const interimPrincipalPaydown = regularPayments.reduce((sum, payment) => sum + payment.principal, 0);
+    
+    // Calculate daily interest amount
+    const annualRate = parseFloat(document.getElementById('interestRate')?.value || 0);
+    const dailyInterest = (principalBalance * (annualRate / 100)) / 365;
+    
+    // Calculate accrued interest from final payment to payoff date
+    let accruedInterest = 0;
+    if (finalPaymentDate) {
+        const finalPaymentDateObj = new Date(finalPaymentDate);
+        const daysDifference = Math.ceil((payoffDateObj - finalPaymentDateObj) / (1000 * 60 * 60 * 24));
+        accruedInterest = dailyInterest * daysDifference;
+    }
+    
+    // Update calculated fields
+    document.getElementById('regularPaymentsUntilPayoff').value = regularPayments.length;
+    
+    // Convert final payment date to proper input format if it exists
+    if (finalPaymentDate) {
+        const finalDate = new Date(finalPaymentDate);
+        const formattedFinalDate = finalDate.toISOString().split('T')[0];
+        document.getElementById('finalPaymentBeforePayoff').value = formattedFinalDate;
+    } else {
+        document.getElementById('finalPaymentBeforePayoff').value = '';
+    }
+    
+    // Set calculated values (no commas for number inputs)
+    document.getElementById('interimPrincipalPaydown').value = interimPrincipalPaydown.toFixed(2);
+    document.getElementById('dailyInterestAmount').value = dailyInterest.toFixed(2);
+    document.getElementById('accruedInterestAtPayoff').value = accruedInterest.toFixed(2);
+    
+    // Update payoff summary
+    updatePayoffSummary(principalBalance, interimPrincipalPaydown, accruedInterest, payoffDate, pedDate, finalPaymentDate);
+}
+
+function updatePayoffSummary(principalBalance, interimPrincipalPaydown, accruedInterest, payoffDate, pedDate, finalPaymentDate) {
+    const payoffAmount = principalBalance - interimPrincipalPaydown + accruedInterest;
+    
+    // Create or update summary section
+    let summarySection = document.getElementById('payoffSummarySection');
+    if (!summarySection) {
+        summarySection = document.createElement('div');
+        summarySection.id = 'payoffSummarySection';
+        summarySection.className = 'summary-section';
+        summarySection.style.marginTop = '2rem';
+        
+        // Insert after tab-specific fields
+        const tabContainer = document.getElementById('tabSpecificFieldsContainer');
+        tabContainer.parentNode.insertBefore(summarySection, tabContainer.nextSibling);
+    }
+    
+    // Format all dates consistently using the same format
+    const dateFormatOptions = { year: 'numeric', month: 'short', day: 'numeric' };
+    
+    const payoffDateObj = new Date(payoffDate + 'T00:00:00');
+    const pedDateObj = new Date(pedDate + 'T00:00:00');
+    
+    const formattedPayoffDate = isNaN(payoffDateObj.getTime()) ? payoffDate : payoffDateObj.toLocaleDateString('en-US', dateFormatOptions);
+    const formattedPEDDate = isNaN(pedDateObj.getTime()) ? pedDate : pedDateObj.toLocaleDateString('en-US', dateFormatOptions);
+    
+    let formattedFinalPaymentDate = 'N/A';
+    if (finalPaymentDate) {
+        const finalPaymentDateObj = new Date(finalPaymentDate + 'T00:00:00');
+        formattedFinalPaymentDate = isNaN(finalPaymentDateObj.getTime()) ? finalPaymentDate : finalPaymentDateObj.toLocaleDateString('en-US', dateFormatOptions);
+    }
+    
+    summarySection.innerHTML = `
+        <h2 style="text-align: center; color: #1e40af; margin-bottom: 1rem;">Payoff Summary</h2>
+        
+        <div style="background: white; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; border: 1px solid #e5e7eb;">
+            <h3 style="margin-bottom: 0.5rem; font-size: 0.9rem; color: #374151;">Formula:</h3>
+            <p style="font-size: 0.85rem; background: #f9fafb; padding: 0.5rem; border-radius: 4px; margin: 0; line-height: 1.4;">
+                Payoff Amount on ${formattedPayoffDate} = Principal Balance on ${formattedPEDDate} - Principal Paydown (${formattedPEDDate} to ${formattedPayoffDate}) + Accrued Interest (${formattedFinalPaymentDate} to ${formattedPayoffDate})
+            </p>
+        </div>
+        
+        <div style="background: white; border-radius: 8px; padding: 1rem; border: 1px solid #e5e7eb;">
+            <h3 style="margin-bottom: 0.5rem; font-size: 0.9rem; color: #374151;">Calculation:</h3>
+            <p style="font-size: 1rem; font-weight: bold; color: #1e40af; margin: 0;">
+                Payoff Amount on ${formattedPayoffDate}: ${formatCurrency(payoffAmount)}
+            </p>
+            <p style="font-size: 0.9rem; color: #6b7280; margin-top: 0.5rem; margin-bottom: 0;">
+                ${formatCurrency(principalBalance)} - ${formatCurrency(interimPrincipalPaydown)} + ${formatCurrency(accruedInterest)} = ${formatCurrency(payoffAmount)}
+            </p>
+        </div>
+    `;
+}
+
+function getFormValues() {
+    return {
+        loanAmount: getNumericValue('loanAmount'),
+        interestRate: parseFloat(document.getElementById('interestRate')?.value || 0),
+        loanTerm: (() => {
+            const years = parseInt(document.getElementById('loanTermYears')?.value || 0);
+            const months = parseInt(document.getElementById('loanTermMonths')?.value || 0);
+            return years + (months / 12);
+        })(),
+        startDate: document.getElementById('startDate')?.value || new Date().toISOString().split('T')[0],
+        firstPaymentDate: document.getElementById('firstPaymentDate')?.value || (() => {
+            const startDate = document.getElementById('startDate')?.value || new Date().toISOString().split('T')[0];
+            const start = new Date(startDate);
+            const firstPayment = new Date(start.getFullYear(), start.getMonth() + 1, 1);
+            return firstPayment.toISOString().split('T')[0];
+        })(),
+        paymentDueDay: document.getElementById('paymentDueDay')?.value || 'first'
+    };
+}
+
+function updateDefaultPrincipalBalance() {
+    const pedDate = document.getElementById('payoffEstimateDate')?.value;
+    const principalBalanceInput = document.getElementById('principalBalanceOnPED');
+    
+    if (!pedDate || !principalBalanceInput || principalBalanceInput.value) {
+        return; // Don't override if user has entered a value
+    }
+    
+    const schedule = currentSchedule;
+    if (!schedule || schedule.length === 0) {
+        return;
+    }
+    
+    // Find the balance as of PED from the amortization schedule
+    const pedDateObj = new Date(pedDate);
+    let balanceOnPED = 0;
+    
+    for (let i = 0; i < schedule.length; i++) {
+        const paymentDate = new Date(schedule[i].date);
+        if (paymentDate <= pedDateObj) {
+            balanceOnPED = schedule[i].balance;
+        } else {
+            break;
+        }
+    }
+    
+    // Set value without commas for number input
+    principalBalanceInput.value = balanceOnPED.toFixed(2);
+}
+
+function getRegularPaymentsBetweenDates(schedule, startDate, endDate) {
+    return schedule.filter(payment => {
+        const paymentDate = new Date(payment.date);
+        return paymentDate > startDate && paymentDate <= endDate;
+    });
+}
+
+function getFinalPaymentBeforeDate(schedule, endDate) {
+    let finalPaymentDate = null;
+    
+    for (let i = 0; i < schedule.length; i++) {
+        const paymentDate = new Date(schedule[i].date);
+        if (paymentDate < endDate) {
+            finalPaymentDate = schedule[i].date;
+        } else {
+            break;
+        }
+    }
+    
+    return finalPaymentDate;
+}
+
+function getTodayDate() {
+    return new Date().toISOString().split('T')[0];
+}
+
+function getDefaultPayoffDate() {
+    const today = new Date();
+    const twoMonthsFromNow = new Date(today.getFullYear(), today.getMonth() + 2, today.getDate());
+    return twoMonthsFromNow.toISOString().split('T')[0];
+}
