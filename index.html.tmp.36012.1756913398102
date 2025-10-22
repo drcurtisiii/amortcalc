@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amortization Calculator</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+    <!-- Sticky Header -->
+    <div class="header-container">
+        <div class="header-content">
+            <!-- 2x2 Grid Layout -->
+            <!-- A1: Title with Shield and Text -->
+            <div class="header-cell header-a1">
+                <h1 class="title">
+                    <img src="CLF-SHIELD-BRASS-FINAL.png" alt="CLF Logo" class="title-icon"> Amortization Calculator
+                </h1>
+            </div>
+            
+            <!-- B1: First Row Loan Type Buttons -->
+            <div class="header-cell header-b1">
+                <div class="loan-type-buttons-row1">
+                    <button class="loan-type-btn active" data-type="standard">Standard</button>
+                    <button class="loan-type-btn" data-type="recasting">Recasting</button>
+                    <button class="loan-type-btn" data-type="balloon">Balloon</button>
+                    <button class="loan-type-btn" data-type="arm">Adjustable Rate</button>
+                </div>
+            </div>
+            
+            <!-- A2: Action Buttons -->
+            <div class="header-cell header-a2">
+                <div class="action-buttons">
+                    <button id="printBtn" class="btn btn-action">Print</button>
+                    <button id="noteBtn" class="btn btn-action">Note</button>
+                    <button id="saveBtn" class="btn btn-action">Save</button>
+                    <label for="loadFile" class="btn btn-action">
+                        Load
+                        <input type="file" id="loadFile" accept=".json,.zip" style="display: none;">
+                    </label>
+                </div>
+            </div>
+            
+            <!-- B2: Second Row Loan Type Buttons -->
+            <div class="header-cell header-b2">
+                <div class="loan-type-buttons-row2">
+                    <button class="loan-type-btn" data-type="desired-payment">Desired Payment</button>
+                    <button class="loan-type-btn" data-type="payoff-calculator">Payoff Calculator</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="calculator-card">
+            <!-- Common Fields Container - 4x2 Grid -->
+            <div id="commonFieldsContainer" class="common-fields-container">
+                <!-- Fields will be dynamically populated in a 4x2 grid -->
+            </div>
+            
+            <!-- Tab-Specific Fields Container -->
+            <div id="tabSpecificFieldsContainer" class="tab-specific-fields-container">
+                <!-- Tab-specific fields will be dynamically populated -->
+            </div>
+            
+            <!-- Summary Section -->
+            <div id="summarySection" class="summary-section" style="display: none;">
+                <h2>Loan Summary</h2>
+                <div id="summaryContent" class="summary-grid">
+                    <!-- Summary will be populated dynamically -->
+                </div>
+            </div>
+            
+            <!-- Chart Section -->
+            <div id="chartSection" class="chart-section" style="display: none;">
+                <h2>Payment Breakdown Over Time</h2>
+                <div class="chart-container">
+                    <canvas id="paymentChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- Amortization Schedule Table -->
+            <div id="scheduleSection" class="schedule-section">
+                <h2>Amortization Schedule</h2>
+                <div class="table-container">
+                    <table id="scheduleTable" class="schedule-table">
+                        <thead>
+                            <tr>
+                                <th>Month</th>
+                                <th>Date</th>
+                                <th class="text-right">Payment</th>
+                                <th class="text-right">Principal</th>
+                                <th class="text-right">Interest</th>
+                                <th class="text-right">Balance</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scheduleBody">
+                            <!-- Table rows will be populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Note Modal -->
+    <div id="noteModal" class="note-modal" style="display: none;">
+        <div class="note-modal-content">
+            <div class="note-modal-header">
+                <h2>Promissory Note Templates</h2>
+                <button class="note-modal-close" onclick="closeNoteModal()">&times;</button>
+            </div>
+            <div class="note-modal-body">
+                <p>Select the type of promissory note to generate:</p>
+                <div class="note-type-buttons">
+                    <button class="note-type-btn" data-type="standard">Standard</button>
+                    <button class="note-type-btn" data-type="recasting">Recasting</button>
+                    <button class="note-type-btn" data-type="balloon">Balloon</button>
+                    <button class="note-type-btn" data-type="arm">Adjustable Rate</button>
+                    <button class="note-type-btn" data-type="desired-payment">Desired Payment</button>
+                </div>
+                <div id="noteLanguageContainer" class="note-language-container" style="display: none;">
+                    <h3 id="noteLanguageTitle">Promissory Note Language</h3>
+                    <textarea id="noteLanguageText" class="note-language-text" readonly></textarea>
+                    <div class="note-actions">
+                        <button id="copyNoteBtn" class="btn btn-primary">Copy to Clipboard</button>
+                        <button id="selectAllNoteBtn" class="btn btn-secondary">Select All</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/utils.js"></script>
+    <script src="js/field-sync.js"></script>
+    <script src="js/rate-fetching.js"></script>
+    <script src="js/standard-loan.js"></script>
+    <script src="js/recasting-loan.js"></script>
+    <script src="js/balloon-loan.js"></script>
+    <script src="js/arm-loan.js"></script>
+    <script src="js/desired-payment.js"></script>
+    <script src="js/payoff-calculator.js"></script>
+    <script src="js/chart-handler.js"></script>
+    <script src="js/pdf-generator.js"></script>
+    <script src="js/promissory-notes.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
