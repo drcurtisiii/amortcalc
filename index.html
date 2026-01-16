@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
     <!-- Sticky Header -->
@@ -84,6 +85,9 @@
             <!-- Amortization Schedule Table -->
             <div id="scheduleSection" class="schedule-section">
                 <h2>Amortization Schedule</h2>
+                <div class="schedule-actions">
+                    <button id="downloadExcelBtn" class="btn btn-success schedule-download-btn" type="button">Download to Excel</button>
+                </div>
                 <div class="table-container">
                     <table id="scheduleTable" class="schedule-table">
                         <thead>

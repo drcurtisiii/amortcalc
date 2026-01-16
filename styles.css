@@ -550,6 +550,17 @@ body {
     text-align: center;
 }
 
+.schedule-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.75rem;
+}
+
+.schedule-download-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .table-container {
     overflow-x: auto;
     border-radius: 8px;
@@ -647,6 +658,10 @@ body {
     
     .summary-grid {
         grid-template-columns: 1fr;
+    }
+
+    .schedule-actions {
+        justify-content: center;
     }
 }
 

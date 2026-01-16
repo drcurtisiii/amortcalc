@@ -18,6 +18,11 @@ function initializeApp() {
     document.getElementById('printBtn').addEventListener('click', generatePDF);
     document.getElementById('saveBtn').addEventListener('click', saveCalculationData);
     document.getElementById('loadFile').addEventListener('change', handleFileLoad);
+    const downloadExcelBtn = document.getElementById('downloadExcelBtn');
+    if (downloadExcelBtn) {
+        downloadExcelBtn.addEventListener('click', downloadScheduleToExcel);
+        setScheduleDownloadEnabled([]);
+    }
     
     // Initialize with standard loan
     switchLoanType('standard');
@@ -41,6 +46,7 @@ function switchLoanType(loanType) {
     currentSchedule = [];
     document.getElementById('summarySection').style.display = 'none';
     document.getElementById('chartSection').style.display = 'none';
+    setScheduleDownloadEnabled(currentSchedule);
     
     // Reset schedule table header (remove ARM rate column if it exists)
     const tableHeader = document.querySelector('#scheduleTable thead tr');
@@ -105,12 +111,82 @@ function calculateCurrentLoanType() {
     }
 }
 
+function downloadScheduleToExcel() {
+    if (!Array.isArray(currentSchedule) || currentSchedule.length === 0) {
+        return;
+    }
+    
+    if (typeof XLSX === 'undefined') {
+        alert('Excel export library not loaded. Please try again.');
+        return;
+    }
+    
+    const includeRate = !!document.querySelector('#scheduleTable thead .rate-header');
+    const headers = includeRate
+        ? ['Month', 'Date', 'Payment', 'Principal', 'Interest', 'Balance', 'Rate (%)']
+        : ['Month', 'Date', 'Payment', 'Principal', 'Interest', 'Balance'];
+    
+    const rows = currentSchedule.map(row => {
+        const rowData = [
+            row.month,
+            row.date,
+            toExcelNumber(row.payment, 2),
+            toExcelNumber(row.principal, 2),
+            toExcelNumber(row.interest, 2),
+            toExcelNumber(row.balance, 2)
+        ];
+        
+        if (includeRate) {
+            rowData.push(toExcelNumber(row.rate, 3));
+        }
+        
+        return rowData;
+    });
+    
+    const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Amortization');
+    XLSX.writeFile(workbook, getScheduleExportFilename());
+}
+
+function setScheduleDownloadEnabled(schedule) {
+    const downloadBtn = document.getElementById('downloadExcelBtn');
+    if (!downloadBtn) {
+        return;
+    }
+    
+    const hasRows = Array.isArray(schedule) && schedule.length > 0;
+    downloadBtn.disabled = !hasRows;
+}
+
+function toExcelNumber(value, decimals) {
+    const numberValue = Number(value);
+    if (!Number.isFinite(numberValue)) {
+        return '';
+    }
+    
+    return Number(numberValue.toFixed(decimals));
+}
+
+function getScheduleExportFilename() {
+    const caseName = document.getElementById('caseName')?.value || '';
+    const dateStamp = new Date().toISOString().split('T')[0];
+    const baseName = caseName ? `Amortization Schedule - ${caseName}` : 'Amortization Schedule';
+    return `${sanitizeFileName(baseName)} ${dateStamp}.xlsx`;
+}
+
+function sanitizeFileName(value) {
+    return value.replace(/[<>:"/\\|?*]+/g, '-').replace(/\s+/g, ' ').trim();
+}
+
 // Override updateScheduleTable for ARM and Recasting loans
 function updateScheduleTable(schedule) {
     if (currentLoanType === 'arm') {
         updateARMScheduleTable(schedule);
+        setScheduleDownloadEnabled(schedule);
     } else if (currentLoanType === 'recasting') {
         updateRecastingScheduleTable(schedule);
+        setScheduleDownloadEnabled(schedule);
     } else {
         // Standard schedule table update
         const tbody = document.getElementById('scheduleBody');
@@ -128,6 +204,7 @@ function updateScheduleTable(schedule) {
             `;
             tbody.appendChild(tr);
         });
+        setScheduleDownloadEnabled(schedule);
     }
 }
 
