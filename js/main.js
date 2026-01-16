@@ -143,10 +143,74 @@ function downloadScheduleToExcel() {
         return rowData;
     });
     
-    const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    const tableData = [headers, ...rows];
+    const worksheet = XLSX.utils.aoa_to_sheet(tableData);
+    applySheetFormatting(worksheet, tableData, includeRate);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Amortization');
-    XLSX.writeFile(workbook, getScheduleExportFilename());
+    XLSX.writeFile(workbook, getScheduleExportFilename(), { bookType: 'xlsx', cellStyles: true });
+}
+
+function applySheetFormatting(worksheet, tableData, includeRate) {
+    applyColumnWidths(worksheet, tableData, includeRate);
+    applyCellStyles(worksheet, includeRate);
+}
+
+function applyColumnWidths(worksheet, tableData, includeRate) {
+    const columnWidths = tableData[0].map((header, columnIndex) => {
+        let maxLength = String(header || '').length;
+        
+        for (let rowIndex = 1; rowIndex < tableData.length; rowIndex++) {
+            const value = tableData[rowIndex][columnIndex];
+            const displayValue = getExcelDisplayValue(value, columnIndex, includeRate);
+            maxLength = Math.max(maxLength, displayValue.length);
+        }
+        
+        return Math.min(Math.max(maxLength + 2, 10), 40);
+    });
+    
+    worksheet['!cols'] = columnWidths.map(width => ({ wch: width }));
+}
+
+function getExcelDisplayValue(value, columnIndex, includeRate) {
+    if (value === null || value === undefined) {
+        return '';
+    }
+    
+    if (columnIndex >= 2 && columnIndex <= 5 && Number.isFinite(value)) {
+        return formatCurrency(value);
+    }
+    
+    if (includeRate && columnIndex === 6 && Number.isFinite(value)) {
+        return value.toFixed(3);
+    }
+    
+    return String(value);
+}
+
+function applyCellStyles(worksheet, includeRate) {
+    if (!worksheet['!ref']) {
+        return;
+    }
+    
+    const font = { name: 'Work Sans', sz: 11 };
+    const range = XLSX.utils.decode_range(worksheet['!ref']);
+    
+    for (let row = range.s.r; row <= range.e.r; row++) {
+        for (let col = range.s.c; col <= range.e.c; col++) {
+            const address = XLSX.utils.encode_cell({ r: row, c: col });
+            const cell = worksheet[address];
+            if (!cell) {
+                continue;
+            }
+            
+            cell.s = cell.s ? { ...cell.s, font } : { font };
+            
+            if (row > 0 && col >= 2 && col <= 5 && typeof cell.v === 'number') {
+                cell.z = '$#,##0.00';
+            }
+        }
+    }
 }
 
 function setScheduleDownloadEnabled(schedule) {
