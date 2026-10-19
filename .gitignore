@@ -1,0 +1,48 @@
+# --- Secrets ---
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+secrets.*
+*secret*
+credentials*.json
+.netlify/
+
+# --- Build output / dependencies ---
+dist/
+build/
+node_modules/
+.npm/
+npm-debug.log*
+yarn-error.log*
+
+# --- Data & exports (client data must never be committed) ---
+data/
+exports/
+*.xlsx
+*.xls
+*.csv
+Amortization Schedule*.*
+Amortization *.json
+*.zip
+
+# --- Local agent / editor settings ---
+.claude/settings.local.json
+.claude/*.tmp.*
+.vscode/
+.idea/
+*.swp
+*~
+
+# --- OS cruft ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Editor temp files ---
+*.tmp
+*.tmp.*
