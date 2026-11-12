@@ -6,7 +6,12 @@
   "scripts": {
     "build": "node -e \"const fs = require('fs'); const path = require('path'); if (!fs.existsSync('dist')) fs.mkdirSync('dist'); const files = fs.readdirSync('.').filter(f => !f.startsWith('.') && f !== 'dist' && f !== 'node_modules' && f !== 'copilotworkspace'); files.forEach(f => { const stat = fs.statSync(f); if (stat.isFile()) { fs.copyFileSync(f, path.join('dist', f)); } else if (stat.isDirectory()) { fs.cpSync(f, path.join('dist', f), {recursive: true}); } }); console.log('Static site copied to dist folder');\"",
     "start": "npx serve .",
-    "dev": "npx live-server ."
+    "dev": "npx live-server .",
+    "stage": "node tools/stage-site.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "dry-run:cf": "node tools/stage-site.mjs && npx --yes wrangler@4.157.0 deploy --dry-run --outdir .wrangler/dry-run",
+    "deploy:cf": "node tools/stage-site.mjs && npx --yes wrangler@4.157.0 deploy",
+    "dev:cf": "node tools/stage-site.mjs && npx --yes wrangler@4.157.0 dev"
   },
   "keywords": [
     "amortization",
@@ -22,5 +27,8 @@
   "dependencies": {
     "lucide-react": "^0.539.0",
     "recharts": "^3.1.2"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.65.0"
   }
 }

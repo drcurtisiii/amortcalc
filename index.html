@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Amortization Calculator</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="app-extras.css">
+    <link rel="icon" type="image/png" href="clf-shield-brass-final.png">
+    <!-- AI agents: this page exposes window.AmortizationAgent; start at the manifest below. -->
+    <link rel="service-desc" type="application/json" href="/.well-known/agent.json">
+    <link rel="alternate" type="text/markdown" href="/agent.md" title="Agent notes">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
@@ -17,7 +22,7 @@
             <!-- A1: Title with Shield and Text -->
             <div class="header-cell header-a1">
                 <h1 class="title">
-                    <img src="CLF-SHIELD-BRASS-FINAL.png" alt="CLF Logo" class="title-icon"> Amortization Calculator
+                    <img src="clf-shield-brass-final.png" alt="CLF Logo" class="title-icon"> Amortization Calculator
                 </h1>
             </div>
             
@@ -41,7 +46,12 @@
                         Load
                         <input type="file" id="loadFile" accept=".json,.zip" style="display: none;">
                     </label>
+                    <button id="projectsBtn" class="btn btn-action" type="button" data-app-chrome>Projects</button>
+                    <button id="aiAgentButton" class="btn btn-action ai-agent-btn" type="button" data-app-chrome aria-label="Copy a prompt for your AI agent" title="Copy a one-line prompt for your AI agent">
+                        <img src="ai-agent-icon.png" alt="" width="22" height="22"><span id="aiAgentStatus" class="ai-agent-status" aria-hidden="true"></span>
+                    </button>
                 </div>
+                <div id="aiAgentNotice" class="ai-agent-notice" role="status" aria-live="polite" data-app-chrome hidden></div>
             </div>
             
             <!-- B2: Second Row Loan Type Buttons -->
@@ -151,5 +161,7 @@
     <script src="js/pdf-generator.js"></script>
     <script src="js/promissory-notes.js"></script>
     <script src="js/main.js"></script>
+    <script src="js/projects.js"></script>
+    <script src="js/agent-bridge.js"></script>
 </body>
 </html>

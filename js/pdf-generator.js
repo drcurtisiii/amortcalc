@@ -954,14 +954,20 @@ function getSummaryData() {
 }
 
 // File save/load functionality
-function saveCalculationData() {
-    const data = {
+// The calculation snapshot (same shape the Save button has always written). Shared by the Save
+// button, project saves (js/projects.js) and the AI bridge (js/agent-bridge.js).
+function buildCalculationData() {
+    return {
         caseName: document.getElementById('caseName').value,
         loanType: currentLoanType,
         timestamp: new Date().toISOString(),
         schedule: currentSchedule,
         inputs: getCurrentInputValues()
     };
+}
+
+function saveCalculationData() {
+    const data = buildCalculationData();
     
     const jsonString = JSON.stringify(data, null, 2);
     const saveDate = new Date().toISOString().split('T')[0];
@@ -980,6 +986,8 @@ function getCurrentInputValues() {
     );
     
     inputElements.forEach(element => {
+        // App chrome (project panel, admin key, AI prompt dialog) is never part of a calculation
+        if (element.closest && element.closest('[data-app-chrome]')) return;
         // Only save inputs that have an ID (avoid duplicates and unnamed elements)
         if (element.id) {
             if (element.type === 'checkbox') {
@@ -1004,51 +1012,67 @@ async function loadCalculationData(file) {
     try {
         const text = await file.text();
         const data = JSON.parse(text);
-        
-        // Set case name
-        document.getElementById('caseName').value = data.caseName || '';
-        
-        // Set loan type
-        if (data.loanType && data.loanType !== currentLoanType) {
-            switchLoanType(data.loanType);
-        }
-        
-        // Wait for fields to be created
-        setTimeout(() => {
-            // Restore shared field values first if they exist
-            if (data.inputs && data.inputs.sharedFieldValues) {
-                window.sharedFieldValues = { ...window.sharedFieldValues, ...data.inputs.sharedFieldValues };
-            }
-            
-            // Restore input values
-            Object.entries(data.inputs || {}).forEach(([key, value]) => {
-                // Skip the sharedFieldValues object (we handled it above)
-                if (key === 'sharedFieldValues') return;
-                
-                const element = document.getElementById(key);
-                if (element) {
-                    if (element.type === 'checkbox') {
-                        element.checked = value;
-                    } else {
-                        element.value = value;
-                    }
-                    
-                    // Trigger synchronization for synchronized fields
-                    if (window.sharedFieldValues && window.sharedFieldValues.hasOwnProperty(key)) {
-                        window.sharedFieldValues[key] = value;
-                        // Trigger input event to sync field across tabs
-                        element.dispatchEvent(new Event('input', { bubbles: true }));
-                    }
-                }
-            });
-            
-            // Recalculate with loaded data
-            calculateCurrentLoanType();
-        }, 200); // Increased timeout to allow for field synchronization
-        
+        await applyCalculationData(data);
     } catch (error) {
         alert('Error loading file: ' + error.message);
     }
+}
+
+// Applies a saved calculation snapshot to the live page (same steps the Load button always took).
+// Resolves once the fields are restored and the schedule recalculated.
+function applyCalculationData(data) {
+    return new Promise((resolve, reject) => {
+        try {
+            if (!data || typeof data !== 'object') throw new Error('Not a calculation file.');
+            // Set case name
+            document.getElementById('caseName').value = data.caseName || '';
+            
+            // Set loan type
+            if (data.loanType && data.loanType !== currentLoanType) {
+                switchLoanType(data.loanType);
+            }
+            
+            // Wait for fields to be created
+            setTimeout(() => {
+                try {
+                    // Restore shared field values first if they exist
+                    if (data.inputs && data.inputs.sharedFieldValues) {
+                        window.sharedFieldValues = { ...window.sharedFieldValues, ...data.inputs.sharedFieldValues };
+                    }
+                    
+                    // Restore input values
+                    Object.entries(data.inputs || {}).forEach(([key, value]) => {
+                        // Skip the sharedFieldValues object (we handled it above)
+                        if (key === 'sharedFieldValues') return;
+                        
+                        const element = document.getElementById(key);
+                        if (element && element.type !== 'file' && !(element.closest && element.closest('[data-app-chrome]'))) {
+                            if (element.type === 'checkbox') {
+                                element.checked = value;
+                            } else {
+                                element.value = value;
+                            }
+                            
+                            // Trigger synchronization for synchronized fields
+                            if (window.sharedFieldValues && window.sharedFieldValues.hasOwnProperty(key)) {
+                                window.sharedFieldValues[key] = value;
+                                // Trigger input event to sync field across tabs
+                                element.dispatchEvent(new Event('input', { bubbles: true }));
+                            }
+                        }
+                    });
+                    
+                    // Recalculate with loaded data
+                    calculateCurrentLoanType();
+                    resolve(data);
+                } catch (error) {
+                    reject(error);
+                }
+            }, 200); // Increased timeout to allow for field synchronization
+        } catch (error) {
+            reject(error);
+        }
+    });
 }
 
 // Payoff Calculator PDF Generation functionality

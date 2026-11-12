@@ -1,3 +1,5 @@
+> **Hosting (11/2026):** now on Cloudflare Workers at https://amortization-calculator.curtis-bots.workers.dev — see `CLOUDFLARE.md`. The Netlify notes below are historical.
+
 # Amortization Calculator
 
 A professional-grade loan amortization calculator with live Federal Reserve data integration, designed for legal and financial professionals.
