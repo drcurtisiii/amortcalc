@@ -126,7 +126,7 @@ function createInputElement(id, type, label, value, placeholder = '', min = null
     // Add info icon if infoText is provided
     if (infoText) {
         const infoIcon = document.createElement('img');
-        infoIcon.src = 'BLUEI.png';
+        infoIcon.src = 'bluei.png'; // lower case: Cloudflare paths are case-sensitive
         infoIcon.className = 'info-icon';
         infoIcon.alt = 'Information';
         infoIcon.title = 'Click for information';

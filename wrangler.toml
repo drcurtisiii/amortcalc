@@ -1,0 +1,26 @@
+# Amortization Calculator on Cloudflare Workers (FREE plan only; see CLOUDFLARE.md).
+# Kind C: static site plus a small Worker on /api/* for project saves in Dropbox.
+# Static files never invoke the Worker (run_worker_first lists /api/* only). No proxy is needed.
+# Staging only: workers.dev, no routes, no custom domain, no bindings beyond ASSETS.
+# Secrets are NOT in this file. Set with `npx --yes wrangler@4.157.0 secret put NAME`:
+#   DROPBOX_APP_KEY, DROPBOX_APP_SECRET, DROPBOX_REFRESH_TOKEN, AMORT_ADMIN_KEY
+name = "amortization-calculator"
+main = "cloudflare/worker.mjs"
+compatibility_date = "2026-10-01"
+workers_dev = true
+preview_urls = false
+
+[assets]
+directory = "./_site"          # built by `npm run stage` (tools/stage-site.mjs); never the repo root
+binding = "ASSETS"
+run_worker_first = ["/api/*"]
+not_found_handling = "404-page"
+html_handling = "auto-trailing-slash"
+
+[vars]                         # public values only
+DROPBOX_DATA_ROOT = "/APPS DATABASE/AMORTIZATION CALCULATOR"
+# DROPBOX_PATH_ROOT is deliberately unset: /APPS DATABASE lives in the authorized member's home
+# namespace, where every other app's folder already is (see CLOUDFLARE.md).
+
+[observability]
+enabled = true

@@ -1,0 +1,7 @@
+_site/
+_site.old-*/
+.wrangler/
+node_modules/
+.dev.vars
+.env*
+*.key

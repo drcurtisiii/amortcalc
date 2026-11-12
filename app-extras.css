@@ -1,0 +1,33 @@
+/* Additions for the Cloudflare edition: Projects panel, AI button, notice and fallback dialog. */
+.ai-agent-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; padding-left: 10px; padding-right: 10px; }
+.ai-agent-btn img { display: block; width: 22px; height: 22px; border-radius: 50%; }
+.ai-agent-status { position: absolute; top: 3px; right: 3px; width: 7px; height: 7px; border-radius: 50%; background: #94a3b8; }
+.ai-agent-status[data-state="ready"] { background: #22c55e; }
+.ai-agent-notice { position: fixed; right: 16px; bottom: 16px; z-index: 3000; max-width: min(420px, calc(100vw - 32px)); background: #1e293b; color: #fff; padding: 10px 14px; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.25); font-size: 14px; }
+.ai-agent-notice[hidden] { display: none; }
+.app-overlay { position: fixed; inset: 0; z-index: 2500; background: rgba(15, 23, 42, .45); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.app-overlay[hidden] { display: none; }
+.app-dialog { background: #fff; color: #1e293b; border-radius: 10px; width: min(640px, 100%); max-height: calc(100vh - 32px); overflow: auto; padding: 18px 20px; box-shadow: 0 20px 50px rgba(0,0,0,.3); }
+.app-dialog-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.app-dialog-header h2 { margin: 0; font-size: 1.2rem; }
+.app-dialog-close { border: 0; background: transparent; font-size: 1.6rem; line-height: 1; cursor: pointer; color: #475569; }
+.app-dialog textarea { width: 100%; box-sizing: border-box; font-family: ui-monospace, Consolas, monospace; font-size: 13px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; resize: vertical; }
+.projects-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.projects-row label { font-weight: 600; }
+.projects-row input { flex: 1 1 200px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; }
+.projects-current { margin: 4px 0 8px; color: #334155; }
+.projects-status { min-height: 1.2em; margin: 4px 0; font-size: 14px; }
+.projects-status[data-kind="error"] { color: #b91c1c; }
+.projects-status[data-kind="ok"] { color: #047857; }
+.projects-list-header { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+.projects-list-header h3, .projects-local h3 { margin: 6px 0; font-size: 1rem; }
+.projects-list { list-style: none; padding: 0; margin: 0; max-height: 260px; overflow: auto; border: 1px solid #e2e8f0; border-radius: 6px; }
+.projects-list:empty { display: none; }
+.projects-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid #e2e8f0; }
+.projects-list li:last-child { border-bottom: 0; }
+.projects-item-name { font-weight: 600; flex: 1 1 160px; }
+.projects-item-meta { color: #64748b; font-size: 13px; flex: 1 1 200px; }
+.projects-key, .projects-local { margin-top: 12px; padding-top: 8px; border-top: 1px solid #e2e8f0; }
+.projects-key summary { cursor: pointer; font-weight: 600; }
+.btn-danger { background: #dc2626; color: #fff; border: 0; }
+@media (max-width: 600px) { .app-dialog { padding: 14px; } .ai-agent-notice { left: 16px; right: 16px; } }
